@@ -176,7 +176,7 @@ To simplify the user creation process, we can use [the Runai API](https://api-do
    and save the `Client ID` and `Client secret` to the `secrets/env.sh` file.
 
    ```
-   export RUNAI_DASHBOARD_URL="https://runai.local"
+   export RUNAI_URL="https://runai.local"
    export RUNAI_CLIENT_ID="<YOUR_APPLICATION_NAME>"
    export RUNAI_CLIENT_SECRET="<YOUR_APPLICATION_SECRET>"
    export STORAGE_NODE_IP="<STORAGE_NODE_IP>"

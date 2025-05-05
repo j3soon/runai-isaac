@@ -18,7 +18,7 @@ cd run-ai-isaac
 Fill in the Run:ai server information in `secrets/env.sh` based on the information provided by the cluster admin, for example:
 
 ```
-export RUNAI_DASHBOARD_URL="https://runai.local"
+export RUNAI_URL="https://runai.local"
 export STORAGE_NODE_IP="<STORAGE_NODE_IP>"
 export FTP_USER="<FTP_USER>"
 export FTP_PASS="<FTP_PASS>"
@@ -54,9 +54,9 @@ If you need to connect multiple machines to the VPN simultaneously, avoid using 
 
 ## Access Run:ai Dashboard
 
-Go to `<RUNAI_DASHBOARD_URL>`. Ignore the warning about the self-signed certificate:
+Go to `<RUNAI_URL>`. Ignore the warning about the self-signed certificate:
 
-- Google Chrome: `Your connection is not private > Advanced > Proceed to <RUNAI_DASHBOARD_URL> (unsafe)`
+- Google Chrome: `Your connection is not private > Advanced > Proceed to <RUNAI_URL> (unsafe)`
 - Firefox: `Warning: Potential Security Risk Ahead > Advanced... > Accept the Risk and Continue`
 
 Log in with your Run:ai account with credentials `<RUNAI_USER_EMAIL>` and `<RUNAI_USER_PASSWORD>` received from the cluster admin.
