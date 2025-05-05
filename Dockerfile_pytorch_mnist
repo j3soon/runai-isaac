@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:23.12-py3
+FROM nvcr.io/nvidia/pytorch:25.04-py3
 
 # Tools and scripts for Omniverse
 COPY thirdparty/omnicli /omnicli
