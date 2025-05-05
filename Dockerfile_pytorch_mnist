@@ -1,6 +1,6 @@
 FROM nvcr.io/nvidia/pytorch:23.12-py3
 
-# Tools and scripts for Omniverse Farm
+# Tools and scripts for Omniverse
 COPY thirdparty/omnicli /omnicli
 COPY scripts/docker/run.sh /run.sh
 
