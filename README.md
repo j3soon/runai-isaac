@@ -95,6 +95,9 @@ We take the PyTorch MNIST training code as an example.
 
    For FileZilla, enter the Host `${STORAGE_NODE_IP}` in `env.sh` and enter the `${FTP_USER}` and `${FTP_PASS}` provided by the cluster admin. Also make sure to set `Edit > Settings > Transfers > File Types > Default transfer type > Binary` to prevent the endlines from being changed, see [this post](https://stackoverflow.com/a/555003) for more details.
 
+   ![](./docs/assets/filezilla-settings-binary.png)
+   ![](./docs/assets/filezilla-upload.png)
+
    For `lftp`, on your local machine run:
 
    ```sh
@@ -122,6 +125,8 @@ We take the PyTorch MNIST training code as an example.
    # Don't close this session just yet, we will need it later
    ```
 
+   ![](./docs/assets/lftp-upload.png)
+
    When uploading a newer version of your code or dataset, always delete the existing directory first. This ensures that any files removed in the new version are not left behind. If you expect you will run a newer version of your code while previous tasks are still running, consider implementing a versioning system by including a version tag in the file path to prevent conflict.
 
 4. Create a new environment for your docker image.
@@ -141,13 +146,17 @@ We take the PyTorch MNIST training code as an example.
    Tools:
      Tool: Jupyter
    Runtime settings:
-     Command: /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token=''"
+     Command: /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
      Arguments: (Empty)
    ```
 
    and then click `CREATE ENVIRONMENT`.
 
    You should create a new environment for each docker image you want to use. In most cases, you will only need to create one environment.
+
+   ![](./docs/assets/environments.png)
+   ![](./docs/assets/environment-new.png)
+   ![](./docs/assets/environment-created.png)
 
 5. Create a new GPU workload based on the environment.
 
@@ -175,9 +184,17 @@ We take the PyTorch MNIST training code as an example.
 
    > The `/run.sh` file mentioned here is the same `run.sh` script that was copied directly into the Docker image without any modifications during the second step. This pre-written helper script streamlines file downloads and uploads to and from Nucleus while also supporting the sequential execution of multiple commands.  
 
+   ![](./docs/assets/workloads.png)
+   ![](./docs/assets/workload-new-interactive-1.png)
+   ![](./docs/assets/workload-new-interactive-2.png)
+   ![](./docs/assets/workload-creating-interactive.png)
+
 6. Connect to the Jupyter Lab.
 
    In `Workload manager > Workloads`, select the workload you just created and click `CONNECT > Jupyter` and click `Terminal`.
+
+   ![](./docs/assets/workload-connect-jupyter.png)
+   ![](./docs/assets/jupyter-lab.png)
 
 7. Extract the dataset.
 
@@ -193,6 +210,8 @@ We take the PyTorch MNIST training code as an example.
    ls
    ```
    > Although `/mnt/nfs` is a Network File System (NFS) mounted volume, it typically isn't the bottleneck during training. However, if you notice that your dataloader is causing performance issues, consider copying the dataset to the container's local storage before starting the training process. The NFS volume may also cause issues if you are using `tar` on the mounted volume, make sure to use the `--no-same-owner` flag to prevent the `tar: XXX: Cannot change ownership to uid XXX, gid XXX: Operation not permitted` error.
+
+   ![](./docs/assets/jupyter-lab-dataset.png)
 
 8. Start Training.
 
@@ -211,12 +230,15 @@ We take the PyTorch MNIST training code as an example.
    >
    > Make sure to store all checkpoints and output files in `/mnt/nfs`. Otherwise, after the container is terminated, all files outside of `/mnt/nfs` (including the home directory) will be permanently deleted. This is because containers are ephemeral and only the NFS mount persists between runs.
 
+   ![](./docs/assets/jupyter-lab-train.png)
+
 9. Download the results.
 
    Inside the previous `lftp` session, run:
 
    ```sh
    cd /mnt/nfs/<YOUR_USERNAME>/mnist
+   cache flush
    ls
    # Download the results
    get mnist_cnn.pt
@@ -225,18 +247,22 @@ We take the PyTorch MNIST training code as an example.
 
    Make sure to delete the results after downloading to save storage space.
 
+   ![](./docs/assets/lftp-download.png)
+
 10. Delete the workload.
 
     Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always delete the workload after you are done with the task to allow maximum resource utilization.
 
     Also note that clicking `STOP` will also delete the container. You won't want to click this button in most cases.
 
+    ![](./docs/assets/workload-delete.png)
+
 11. (Optional) Alternative to interactive Jupyter Lab workloads, you may want to submit a batch workload.
 
     Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Batch`.
 
     ```
-    Workspace name: <YOUR_USERNAME>-pytorch-mnist-test1
+    Workspace name: <YOUR_USERNAME>-pytorch-mnist-test2
     ```
 
     and click `CONTINUE`.
@@ -258,6 +284,16 @@ We take the PyTorch MNIST training code as an example.
     and then click `CREATE WORKSPACE`.
 
     Note that the batch workload will not automatically restart when it fails since we set the backoff limit to 1. There is currently no way to set the backoff limit to 0, so make sure a workload restart will not overwrite your previous results.
+
+    After the workload is completed, click `SHOW DETAILS` to see the logs.
+
+    ![](./docs/assets/workloads.png)
+    ![](./docs/assets/workload-new-batch-1.png)
+    ![](./docs/assets/workload-new-batch-2.png)
+    ![](./docs/assets/workload-creating-batch.png)
+    ![](./docs/assets/workload-running-batch.png)
+    ![](./docs/assets/workload-completed-batch.png)
+    ![](./docs/assets/workload-show-details-batch.png)
 
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
