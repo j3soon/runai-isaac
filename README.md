@@ -61,6 +61,8 @@ Go to `<RUNAI_URL>`. Ignore the warning about the self-signed certificate:
 
 Log in with your Run:ai account with credentials `<RUNAI_USER_EMAIL>` and `<RUNAI_USER_PASSWORD>` received from the cluster admin.
 
+You will be prompted to change your password. Make sure to take note of the new password.
+
 ## Creating Run:ai Environments and Workloads
 
 ### Jupyter Lab with Custom Base Image
