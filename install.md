@@ -179,6 +179,7 @@ To simplify the user creation process, we can use [the Runai API](https://api-do
    export RUNAI_DASHBOARD_URL="https://runai.local"
    export RUNAI_CLIENT_ID="<YOUR_APPLICATION_NAME>"
    export RUNAI_CLIENT_SECRET="<YOUR_APPLICATION_SECRET>"
+   export STORAGE_NODE_IP="<STORAGE_NODE_IP>"
    ```
 
 2. Add an access rule for the application.
@@ -216,16 +217,88 @@ Since users are trusted to create custom Environments and Templates by themselve
    ```
    Scope: runai/runai-cluster/lab1
    Data source name: lab1-nfs
-   NFS server (host name or host IP): <NFS_STORAGE_NODE_IP>
+   NFS server (host name or host IP): <STORAGE_NODE_IP>
    Mount path: /mnt/nfs/lab1
    Container path: /mnt/nfs
    ---
    Scope: runai/runai-cluster/lab2
    Data source name: lab2-nfs
-   NFS server (host name or host IP): <NFS_STORAGE_NODE_IP>
+   NFS server (host name or host IP): <STORAGE_NODE_IP>
    Mount path: /mnt/nfs/lab2
    Container path: /mnt/nfs
    ```
+
+## Miscellaneous
+
+Some cluster admin notes for future reference.
+
+### Preemption
+
+The default K8s PriorityClass is set as follows:
+
+```
+# kubectl get priorityclass -A
+NAME                      VALUE
+build                     100
+inference                 125
+interactive-preemptible   75
+runai-critical            1000000000
+runai-engine-critical     1000000000
+train                     50
+train-critical            60
+train-high                55
+```
+
+We want to disable preemption by setting the priority class of all workloads to 0. This also allows side-by-side usage of [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac), where the workloads have default priority values of 0.
+
+However, it seems like the priority class is not assigned to the K8s pods as expected. All K8s pods priority seems to be 0, which isn't the expected behavior, but is what we want.
+
+For `Workspace` type workloads:
+
+```sh
+# kubectl get pods -n runai-lab1-default-project test-0-0 -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  ...
+  labels:
+    ...
+    priorityClassName: build
+    ...
+spec:
+  ...
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  ...
+```
+
+For `Training` type workloads:
+
+```sh
+# kubectl get pods -n runai-lab1-default-project test-0-0 -o yaml
+apiVersion: v1
+kind: Pod
+...
+spec:
+  ...
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  ...
+```
+
+### Backoff Limit
+
+The minimal backoff limit that can be set on the GUI is 1.
+
+```
+# kubectl describe RunaiJob -n runai-lab1-default-project | grep "Backoff Limit:"
+  Backoff Limit:                                1
+  Backoff Limit:                                6
+```
+
+In the future, we want to change the minimal backoff limit to 0. When a training job fails after running for several days, users may prefer to manually resume the job using a different script rather than having it automatically retry. Automatic retries could potentially overwrite existing checkpoints and waste compute resources.
+
+While well-designed training workloads should support preemption and automatic checkpoint resumption, we have decided not to impose these requirements on users. This allows them to work in a non-preemptive environment without the burden of implementing resumption capabilities.
 
 ## More Information
 
