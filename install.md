@@ -249,6 +249,8 @@ train-critical            60
 train-high                55
 ```
 
+More details can be found in the documentation pages: [Workload Priority Control](https://run-ai-docs.nvidia.com/guides/platform-management/runai-scheduler/scheduling/workload-priority-class-control) and [Priority and Preemption](https://run-ai-docs.nvidia.com/guides/platform-management/runai-scheduler/scheduling/concepts-and-principles#priority-and-preemption).
+
 We want to disable preemption by setting the priority class of all workloads to 0. This also allows side-by-side usage of [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac), where the workloads have default priority values of 0.
 
 However, it seems like the priority class is not assigned to the K8s pods as expected. All K8s pods priority seems to be 0, which isn't the expected behavior, but is what we want.
