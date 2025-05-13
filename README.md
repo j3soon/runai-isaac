@@ -154,7 +154,7 @@ We take the PyTorch MNIST training code as an example.
 
    and then click `CREATE ENVIRONMENT`.
 
-   You should create a new environment for each docker image you want to use. In most cases, you will only need to create one environment.
+   You should create a new environment for each docker image you want to use. In most cases, you will only need to create one environment. In addition, you can add more tools to the environment, such as TensorBoard, or opening custom ports using the `Custom` tool and `NodePort` connection type.
 
    ![](./docs/assets/environments.png)
    ![](./docs/assets/environment-new.png)
@@ -296,6 +296,8 @@ We take the PyTorch MNIST training code as an example.
     ![](./docs/assets/workload-running-batch.png)
     ![](./docs/assets/workload-completed-batch.png)
     ![](./docs/assets/workload-show-details-batch.png)
+
+> Make sure to always add your username as a prefix to your environment name and workload name. This helps preventing others from accidentally modifying your setups.
 
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 

@@ -2,6 +2,8 @@
 
 Follow [the self-hosted installation guide](https://run-ai-docs.nvidia.com/guides/self-hosted-installation/installation).
 
+Note that K8s with GPU operator can be easily installed using [NVIDIA Cloud Native Stack](https://github.com/NVIDIA/cloud-native-stack).
+
 > Tested on Run:ai v2.20.29.
 
 ## K8s Patches
