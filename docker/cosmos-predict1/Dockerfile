@@ -46,6 +46,10 @@ RUN echo "Installing dependencies. This will take a while..." && \
 # Default command
 CMD ["/bin/bash"]
 
+# Set up conda for bash
+RUN echo ". ~/miniconda3/etc/profile.d/conda.sh && conda activate base" >> ~/.bashrc
+RUN echo "conda activate cosmos-predict1" >> ~/.bashrc
+
 # Tools and scripts for Omniverse
 COPY thirdparty/omnicli /omnicli
 COPY scripts/docker/run.sh /run.sh
