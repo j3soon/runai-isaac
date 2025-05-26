@@ -39,7 +39,8 @@ for i in {0..8}; do
         \"spec\": {
             \"gpuDevicesRequest\": ${i}$([ "$i" -eq 1 ] && echo ",
             \"gpuRequestType\": \"portion\",
-            \"gpuPortionRequest\": 1.0")
+            \"gpuPortionRequest\": 1.0"),
+            \"largeShmRequest\": true
         }
     }"
     
