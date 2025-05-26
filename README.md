@@ -301,9 +301,27 @@ We take the PyTorch MNIST training code as an example.
 
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
-### Isaac Sim Workloads
+## Applications
+
+### Isaac Sim
 
 > To be added.
+
+### Cosmos-Predict1
+
+Create a docker image for [cosmos-predict1](https://github.com/nvidia-cosmos/cosmos-predict1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-predict1/blob/main/INSTALL.md):
+
+```sh
+docker build -f docker/cosmos-predict1/Dockerfile . -t j3soon/runai-cosmos-predict1:latest
+```
+
+### Cosmos-Transfer1
+
+Create a docker image for [cosmos-transfer1](https://github.com/nvidia-cosmos/cosmos-transfer1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-transfer1/blob/main/INSTALL.md):
+
+```sh
+docker build -f docker/cosmos-transfer1/Dockerfile . -t j3soon/runai-cosmos-transfer1:latest
+```
 
 ## Acknowledgements
 

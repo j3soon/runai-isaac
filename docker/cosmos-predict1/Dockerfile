@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y git tree ffmpeg wget
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh && ln -s /lib64/libcuda.so.1 /lib64/libcuda.so
 
 # Copy the cosmos-predict1.yaml and requirements.txt files to the container
-COPY ./cosmos-predict1.yaml /cosmos-predict1.yaml
-COPY ./requirements.txt /requirements.txt
+COPY docker/cosmos-predict1/cosmos-predict1.yaml /cosmos-predict1.yaml
+COPY docker/cosmos-predict1/requirements.txt /requirements.txt
 
 # Install cosmos-predict1 dependencies. This will take a while.
 RUN echo "Installing dependencies. This will take a while..." && \
@@ -45,3 +45,12 @@ RUN echo "Installing dependencies. This will take a while..." && \
 
 # Default command
 CMD ["/bin/bash"]
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
