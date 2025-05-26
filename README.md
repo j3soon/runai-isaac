@@ -2,6 +2,13 @@
 
 > For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
 
+## Pre-built Docker Images
+
+- [j3soon/runai-pytorch-mnist](https://hub.docker.com/r/j3soon/runai-pytorch-mnist)
+- [j3soon/runai-isaac-sim:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)
+- [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1)
+- [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1)
+
 ## Installing Run:ai
 
 For cluster admins, please refer to [install.md](install.md).
@@ -85,7 +92,7 @@ We take the PyTorch MNIST training code as an example.
    ```
 2. Build a custom Docker image with the necessary dependencies and scripts for your tasks and [upload it to Docker Hub](https://docs.docker.com/get-started/workshop/04_sharing_app/).
    ```sh
-   docker build -t j3soon/runai-pytorch-mnist -f Dockerfile_pytorch_mnist .
+   docker build -t j3soon/runai-pytorch-mnist -f docker/pytorch-mnist/Dockerfile .
    docker push j3soon/runai-pytorch-mnist
    ```
    In this example, dependencies are not installed in the Dockerfile. However, in practice, you will want to select a suitable base image and pre-install all dependencies in the Dockerfile such as `pip install -r requirements.txt` to prevent the need of installing dependencies every time after launching a container. You may also want to delete the `.dockerignore` file. In addition, ensure that you always copy the `run.sh` file and the `omnicli` directory directly to the root directory (`/`) without any modifications, rather than placing them in other subdirectories. Failing to do so will result in errors, as the script relies on absolute paths. As a side note, if your code will not be modified, you can also directly copy the code to your Docker image. However, this is usually not the case, as you often want to update your code without rebuilding the Docker image.
@@ -303,25 +310,7 @@ We take the PyTorch MNIST training code as an example.
 
 ## Applications
 
-### Isaac Sim
-
-> To be added.
-
-### Cosmos-Predict1
-
-Create a docker image for [cosmos-predict1](https://github.com/nvidia-cosmos/cosmos-predict1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-predict1/blob/main/INSTALL.md):
-
-```sh
-docker build -f docker/cosmos-predict1/Dockerfile . -t j3soon/runai-cosmos-predict1:latest
-```
-
-### Cosmos-Transfer1
-
-Create a docker image for [cosmos-transfer1](https://github.com/nvidia-cosmos/cosmos-transfer1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-transfer1/blob/main/INSTALL.md):
-
-```sh
-docker build -f docker/cosmos-transfer1/Dockerfile . -t j3soon/runai-cosmos-transfer1:latest
-```
+Please refer to the [docs/applications](./docs/applications.md) file for more details.
 
 ## Acknowledgements
 
