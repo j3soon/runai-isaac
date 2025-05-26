@@ -11,8 +11,7 @@ on:
       - .github/workflows/build_pytorch_mnist.yaml
       - thirdparty/**
       - scripts/docker/run.sh
-      - Dockerfile_pytorch_mnist
-      - .dockerignore
+      - docker/pytorch-mnist/Dockerfile
 
 jobs:
   docker:
@@ -70,6 +69,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./Dockerfile_pytorch_mnist
+          file: ./docker/pytorch-mnist/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
