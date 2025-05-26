@@ -64,7 +64,27 @@ docker push j3soon/runai-isaac-sim:4.5.0
      Run 14b model:
 
      ```sh
+     # Assume running on 1 L40 GPU
      CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python cosmos_predict1/diffusion/inference/video2world.py \
+         --checkpoint_dir checkpoints \
+         --diffusion_transformer_dir Cosmos-Predict1-14B-Video2World \
+         --input_image_or_video_path assets/diffusion/video2world_input0.jpg \
+         --num_input_frames 1 \
+         --offload_tokenizer \
+         --offload_diffusion_transformer \
+         --offload_text_encoder_model \
+         --offload_prompt_upsampler \
+         --offload_guardrail_models \
+         --video_save_name diffusion-video2world-14b
+     ```
+
+     Run 14b model across 8 GPUs:
+
+     ```sh
+     # Assume running on 8 L40 GPUs
+     NUM_GPUS=8
+     CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) torchrun --nproc_per_node=${NUM_GPUS} cosmos_predict1/diffusion/inference/video2world.py \
+         --num_gpus ${NUM_GPUS} \
          --checkpoint_dir checkpoints \
          --diffusion_transformer_dir Cosmos-Predict1-14B-Video2World \
          --input_image_or_video_path assets/diffusion/video2world_input0.jpg \
