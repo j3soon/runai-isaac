@@ -2,25 +2,58 @@
 
 ## Isaac Sim
 
-Create a docker image for [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):
+1. (Optional) Create a docker image for [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):
 
-```sh
-docker build -f docker/isaac-sim/Dockerfile_4_5_0 . -t j3soon/runai-isaac-sim:4.5.0
-docker push j3soon/runai-isaac-sim:4.5.0
-```
+   ```sh
+   docker build -f docker/isaac-sim/Dockerfile_4_5_0 . -t j3soon/runai-isaac-sim:4.5.0
+   docker push j3soon/runai-isaac-sim:4.5.0
+   ```
 
-> TODO
+2. Launch a workspace using the docker image `j3soon/runai-isaac-sim:4.5.0`
+
+   Environment command:
+
+   ```
+   /run.sh "/isaac-sim/python.sh -m pip install jupyterlab" "/isaac-sim/python.sh /isaac-sim/kit/python/bin/jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
+   ```
+
+3. Quick Test:
+
+   ```sh
+   /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/time_stepping.py
+   # or
+   /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py
+   ```
 
 ## Isaac Lab
 
-Create a docker image for [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
+1. (Optional) Create a docker image for [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
 
-```sh
-docker build -f docker/isaac-lab/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab:2.1.0
-docker push j3soon/runai-isaac-lab:2.1.0
-```
+   ```sh
+   docker build -f docker/isaac-lab/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab:2.1.0
+   docker push j3soon/runai-isaac-lab:2.1.0
+   ```
 
-> TODO
+2. Launch a workspace using the docker image `j3soon/runai-isaac-lab:2.1.0`
+
+   Environment command:
+
+   ```
+   /run.sh "/isaac-sim/python.sh -m pip install jupyterlab" "/isaac-sim/python.sh /isaac-sim/kit/python/bin/jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
+   ```
+
+3. [Quick test](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html#running-pre-built-isaac-lab-container):
+
+   ```sh
+   /workspace/isaaclab/isaaclab.sh -p scripts/tutorials/00_sim/log_time.py --headless
+   # View the logs and press Ctrl+C to stop
+   ```
+
+4. [Train Cartpole](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/rl_existing_scripts.html):
+
+   ```sh
+   /workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless
+   ```
 
 ## Cosmos-Predict1
 
@@ -32,6 +65,12 @@ docker push j3soon/runai-isaac-lab:2.1.0
    ```
 
 2. Launch a workspace using the docker image `j3soon/runai-cosmos-predict1`
+
+   Environment command:
+
+   ```
+   /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
+   ```
 
 3. Run the following in Jupyter Lab terminal:
 
