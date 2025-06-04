@@ -11,6 +11,17 @@ docker push j3soon/runai-isaac-sim:4.5.0
 
 > TODO
 
+## Isaac Lab
+
+Create a docker image for [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
+
+```sh
+docker build -f docker/isaac-lab/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab:2.1.0
+docker push j3soon/runai-isaac-lab:2.1.0
+```
+
+> TODO
+
 ## Cosmos-Predict1
 
 1. (Optional) Create a docker image for [cosmos-predict1](https://github.com/nvidia-cosmos/cosmos-predict1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-predict1/blob/main/INSTALL.md):
