@@ -1,3 +1,4 @@
+# Ref: https://github.com/nvidia-cosmos/cosmos-transfer1/blob/main/Dockerfile
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #

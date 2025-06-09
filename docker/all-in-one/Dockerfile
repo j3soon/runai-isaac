@@ -1,3 +1,4 @@
+# Ref: https://github.com/j3soon/dockerfile-fragments
 FROM ubuntu:22.04
 
 # =====Common=====
@@ -233,5 +234,14 @@ EOF
 # We intentionally use `--NotebookApp.*` instead of `--ServerApp.*` to support older versions of Jupyter Lab
 # Note: `--NotebookApp.password` may be used as an alternative, but it requires generating a hashed password which adds complexity
 # Ref: https://stackoverflow.com/a/77117477
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
 
 CMD ["/usr/bin/supervisord", "-n"]
