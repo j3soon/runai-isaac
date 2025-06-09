@@ -181,6 +181,8 @@ We take the PyTorch MNIST training code as an example.
    ```
    Environment:
      Select the environment for your workload: <YOUR_USERNAME>-pytorch-mnist
+     Set the connection for your tool(s):
+       (Optional) Jupyter Access: Set to Specific user(s)
    Compute resource:
      Select the node resources needed to run your workload: gpu1
    Data sources:
@@ -191,6 +193,8 @@ We take the PyTorch MNIST training code as an example.
    ```
 
    and then click `CREATE WORKSPACE`.
+
+   > In our case, we didn't limit the Jupyter access to specific users, so anyone can access the Jupyter Lab.
 
    > The `/run.sh` file mentioned here is the same `run.sh` script that was copied directly into the Docker image without any modifications during the second step. This pre-written helper script streamlines file downloads and uploads to and from Nucleus while also supporting the sequential execution of multiple commands.  
 
