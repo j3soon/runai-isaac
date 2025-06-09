@@ -92,6 +92,8 @@ kubectl label node ovx04 j3soon/runai-node-pool=dev # assume ovx04 is unstable
 
 Refresh the web page of the Run:ai Dashboard to confirm the changes.
 
+> If you have a heterogeneous hardware environment, you can create more node pools to [isolate different hardwares](https://run-ai-docs.nvidia.com/guides/platform-management/aiinitiatives/adapting-ai-initiatives#grouping-your-resources). For example, you can create a node pool for L40 GPUs (`ovx-l40`) and another for H100 GPUs (`dgx-h100`).
+
 ### Organization
 
 Under the Organization section, Run:ai has [2 levels of organization](https://run-ai-docs.nvidia.com/guides/platform-management/aiinitiatives/adapting-ai-initiatives#scopes-in-an-organization): Department and Project. Departments can contain multiple Projects, and resources can be allocated at both levels.

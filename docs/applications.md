@@ -1,5 +1,55 @@
 # Sample Applications
 
+## All-In-One and Extended Workspaces
+
+1. (Optional) Create a docker image for [All-In-One](https://github.com/j3soon/dockerfile-fragments/tree/main/all-in-one) Workspace:
+
+   ```sh
+   # ubuntu 22.04 base
+   docker build -f docker/all-in-one/Dockerfile . -t j3soon/runai-all-in-one
+   docker push j3soon/runai-all-in-one
+   # isaac-sim 4.5.0
+   docker build -f docker/isaac-sim-ex/Dockerfile_4_5_0 . -t j3soon/runai-isaac-sim-ex:4.5.0
+   docker push j3soon/runai-isaac-sim-ex:4.5.0
+   # isaac-lab 2.1.0
+   docker build -f docker/isaac-lab-ex/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab-ex:2.1.0
+   docker push j3soon/runai-isaac-lab-ex:2.1.0
+   ```
+
+2. Launch a workspace using the docker image `j3soon/runai-all-in-one`
+
+   Add 6 tools:
+
+   ```
+   Tools:
+   - Jupyter
+     Connection type: NodePort (Auto generate)
+     Container port: 8888
+   - TensorBoard
+     Connection type: NodePort (Auto generate)
+     Container port: 6006
+   - VSCode
+     Connection type: NodePort (Auto generate)
+     Container port: 8080
+   - noVNC
+     Connection type: NodePort (Auto generate)
+     Container port: 6080
+   - TigerVNC
+     Connection type: NodePort (Auto generate)
+     Container port: 5900
+   - SSH
+     Connection type: NodePort (Auto generate)
+     Container port: 22
+   ```
+
+   Environment command:
+
+   ```
+   /run.sh "/usr/bin/supervisord -n"
+   ```
+
+![](./assets/all-in-one-workspace.png)
+
 ## Isaac Sim
 
 1. (Optional) Create a docker image for [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):
