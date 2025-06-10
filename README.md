@@ -1,5 +1,7 @@
 # Running Isaac Sim Workloads on NVIDIA Run:ai
 
+A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running PyTorch, Isaac Sim, Isaac Lab, Cosmos, and more workloads on Run:ai, and (3) using SSH, VNC, Jupyter Lab, VSCode, TensorBoard, and more tools on Run:ai.
+
 > For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
 
 ## Pre-built Docker Images
@@ -9,6 +11,12 @@
 - [j3soon/runai-isaac-lab:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)
 - [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1)
 - [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1)
+
+See [the Applications section](#applications) for more usage details.
+
+## Supported Tools
+
+See [the Tools section](./docs/tools.md) for more details.
 
 ## Installing Run:ai
 
@@ -314,6 +322,8 @@ We take the PyTorch MNIST training code as an example.
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
 ## Applications
+
+Sample applications include Isaac Sim, Isaac Lab, Cosmos-Predict1, and more.
 
 Please refer to the [docs/applications](./docs/applications.md) file for more details.
 
