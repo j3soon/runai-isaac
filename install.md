@@ -1,6 +1,6 @@
 # Install Run:ai
 
-Follow [the self-hosted installation guide](https://run-ai-docs.nvidia.com/guides/self-hosted-installation/installation).
+Follow [the self-hosted installation guide](https://run-ai-docs.nvidia.com/guides/self-hosted-installation/installation) and the [runai-installer](https://github.com/runai-professional-services/runai-installer).
 
 Note that K8s with GPU operator can be easily installed using [NVIDIA Cloud Native Stack](https://github.com/NVIDIA/cloud-native-stack).
 
@@ -84,6 +84,7 @@ The creation of node pools is not required, but it is often useful for the clust
 Tag each of the nodes with the corresponding node pool label. For an example:
 
 ```sh
+kubectl get nodes --show-labels
 kubectl label node ovx01 j3soon/runai-node-pool=prod
 kubectl label node ovx02 j3soon/runai-node-pool=prod
 kubectl label node ovx03 j3soon/runai-node-pool=prod
@@ -305,6 +306,19 @@ The minimal backoff limit that can be set on the GUI is 1.
 In the future, we want to change the minimal backoff limit to 0. When a training job fails after running for several days, users may prefer to manually resume the job using a different script rather than having it automatically retry. Automatic retries could potentially overwrite existing checkpoints and waste compute resources.
 
 While well-designed training workloads should support preemption and automatic checkpoint resumption, we have decided not to impose these requirements on users. This allows them to work in a non-preemptive environment without the burden of implementing resumption capabilities.
+
+### Show GPU usage across nodes
+
+```sh
+kubectl describe nodes  |  tr -d '\000' | sed -n -e '/^Name/,/Roles/p' -e '/^Capacity/,/Allocatable/p' -e '/^Allocated resources/,/Events/p'  | grep -e Name  -e  nvidia.com  | perl -pe 's/\n//'  |  perl -pe 's/Name:/\n/g' | sed 's/nvidia.com\/gpu:\?//g'  | sed '1s/^/Node Available(GPUs)  Used(GPUs)/' | sed 's/$/ 0 0 0/'  | awk '{print $1, $2, $3}'  | column -t
+```
+
+References:
+- [Can kubectl describe nodes add GPU resource summary?](https://github.com/kubernetes/kubernetes/issues/76995#issuecomment-501239997)
+
+### Writing Admin Scripts
+
+You can operate the Run:ai GUI while opening the `Network` tab in the browser's developer tools. The Run:ai GUI will call the API to perform actions, which you can inspect and use to write admin scripts.
 
 ## More Information
 
