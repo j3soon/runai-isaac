@@ -9,6 +9,7 @@
 ![](./assets/tools-novnc-home.png)
 ![](./assets/tools-novnc-connected.png)
 ![](./assets/tools-novnc-xclock-glxgears-vkcube.png)
+![](./assets/tools-novnc-isaac-sim.png)
 
 ## Jupyter Lab
 
