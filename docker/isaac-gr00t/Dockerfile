@@ -19,7 +19,8 @@ RUN pip install gpustat wandb==0.19.0
 # Create and set working directory
 WORKDIR /workspace
 # Copy pyproject.toml for dependencies
-COPY pyproject.toml .
+# COPY pyproject.toml .
+RUN wget https://raw.githubusercontent.com/NVIDIA/Isaac-GR00T/3c3465aeb6cf8ea582dcf33532fc6fab902287ab/pyproject.toml -O pyproject.toml
 # Install dependencies from pyproject.toml
 RUN pip install -e .
 # There's a conflict in the native python, so we have to resolve it by
@@ -30,9 +31,18 @@ RUN pip uninstall -y opencv-python opencv-python-headless || true
 RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 || true
 RUN pip install opencv-python==4.8.0.74
 RUN pip install --force-reinstall torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 numpy==1.26.4
-COPY getting_started /workspace/getting_started
-COPY scripts /workspace/scripts
-COPY demo_data /workspace/demo_data
+# COPY getting_started /workspace/getting_started
+# COPY scripts /workspace/scripts
+# COPY demo_data /workspace/demo_data
 RUN pip install -e . --no-deps
 # need to install accelerate explicitly to avoid version conflicts
 RUN pip install accelerate>=0.26.0
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh

@@ -105,6 +105,17 @@
    /workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless
    ```
 
+## Isaac GR00T
+
+1. (Optional) Create a docker image for [Isaac GR00T](https://github.com/NVIDIA/Isaac-GR00T) following the [installation guide](https://github.com/NVIDIA/Isaac-GR00T):
+
+   ```sh
+   docker build -f docker/isaac-gr00t/Dockerfile . -t j3soon/runai-isaac-gr00t:n1
+   docker push j3soon/runai-isaac-gr00t:n1
+   ```
+
+> TODO
+
 ## Cosmos-Predict1
 
 1. (Optional) Create a docker image for [cosmos-predict1](https://github.com/nvidia-cosmos/cosmos-predict1) following the [installation guide](https://github.com/nvidia-cosmos/cosmos-predict1/blob/main/INSTALL.md):
