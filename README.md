@@ -6,11 +6,17 @@ A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running
 
 ## Pre-built Docker Images
 
+- [j3soon/runai-all-in-one](https://hub.docker.com/r/j3soon/runai-all-in-one)
 - [j3soon/runai-pytorch-mnist](https://hub.docker.com/r/j3soon/runai-pytorch-mnist)
 - [j3soon/runai-isaac-sim:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)
+- [j3soon/runai-isaac-sim-ex:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)
 - [j3soon/runai-isaac-lab:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)
+- [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)
 - [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1)
 - [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1)
+<!--
+- [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t)
+-->
 
 See [the Applications section](#applications) for more usage details.
 
@@ -326,6 +332,10 @@ We take the PyTorch MNIST training code as an example.
 Sample applications include Isaac Sim, Isaac Lab, Cosmos-Predict1, and more.
 
 Please refer to the [docs/applications](./docs/applications.md) file for more details.
+
+## FAQ
+
+See [the Developer Notes](./docs/developer-notes.md) for more details.
 
 ## Acknowledgements
 
