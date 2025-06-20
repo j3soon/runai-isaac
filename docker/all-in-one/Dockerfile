@@ -182,6 +182,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install jupyterlab
+# Set default Jupyter Lab shell to bash
+ENV SHELL=/bin/bash
 
 # =====Move all password settings to the end=====
 
