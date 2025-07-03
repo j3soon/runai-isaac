@@ -77,6 +77,17 @@ To add these tools to your custom docker image, refer to [j3soon/dockerfile-frag
    /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py
    ```
 
+If using `isaac-sim-ex` docker image, you can use the following command to launch interactive mode:
+
+```sh
+cd /isaac-sim
+ACCEPT_EULA=Y ./runapp.sh
+```
+
+and then go to `Window > Examples > Robotics Examples`, in the `Robotics Examples` window, click `POLICY > Humanoid > LOAD`.
+
+![](./assets/preview/isaac-sim-vnc.png)
+
 ## Isaac Lab
 
 1. (Optional) Create a docker image for [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
@@ -106,6 +117,17 @@ To add these tools to your custom docker image, refer to [j3soon/dockerfile-frag
    ```sh
    /workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless
    ```
+
+If using `isaac-lab-ex` docker image, you can use the following command to launch interactive mode:
+
+```sh
+cd /workspace/isaaclab
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Rough-H1-v0 --num_envs 32 --use_pretrained_checkpoint
+```
+
+You can change the `--num_envs` to a larger number such as `4096`.
+
+![](./assets/preview/isaac-lab-vnc.png)
 
 ## Isaac GR00T
 

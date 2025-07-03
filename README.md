@@ -4,6 +4,13 @@ A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running
 
 > For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
 
+## Previews
+
+| Isaac Sim | Isaac Lab |
+| --- | --- |
+| ![](./docs/assets/preview/isaac-sim-vnc.png) | ![](./docs/assets/preview/isaac-lab-vnc.png) |
+| <video src="https://github.com/user-attachments/assets/dfcc4081-ebf4-4210-8546-3a0477374988"> | <video src="https://github.com/user-attachments/assets/1361dec2-a2b8-4a63-979d-e1b961c1cdb1"> |
+
 ## Pre-built Docker Images
 
 - [j3soon/runai-all-in-one](https://hub.docker.com/r/j3soon/runai-all-in-one)
@@ -18,7 +25,7 @@ A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running
 - [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t)
 -->
 
-See [the Applications section](#applications) for more usage details.
+See [the Applications section](./docs/applications.md) for more usage details.
 
 ## Supported Tools
 
@@ -327,11 +334,7 @@ We take the PyTorch MNIST training code as an example.
 
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
-## Applications
-
-Sample applications include Isaac Sim, Isaac Lab, Cosmos-Predict1, and more.
-
-Please refer to the [docs/applications](./docs/applications.md) file for more details.
+For more details, please refer to [the Applications section](./docs/applications.md).
 
 ## FAQ
 

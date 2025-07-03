@@ -121,7 +121,7 @@ In our case, we have a single cluster where all users are trusted and cooperativ
        GPU devices: 100
    ```
 
-   > The GUI has maximum 100 GPUs, if your cluster have more than 100 GPUs, may need to look into a way to increase the limit.
+   > The GUI has maximum 100 GPUs as default, if your cluster have more than 100 GPUs, the maximum will be automatically increased to the number of GPUs in the cluster.
 
    We will use departments to isolate shared NFS storage among university labs for data sharing. Each department can use all cluster resources since we don't enforce quotas. With trusted and cooperative users, we don't need to [configure over-quota policies](https://run-ai-docs.nvidia.com/guides/platform-management/runai-scheduler/scheduling/how-the-scheduler-works#reclaim-preemption-between-projects-and-departments), saving everyone from the hassle of making their workloads preemptible.
 
