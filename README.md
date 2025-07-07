@@ -37,6 +37,9 @@ For cluster admins, please refer to [install.md](install.md).
 
 ## Setup
 
+> Note that this section is optional if you plan to use the Run:ai Dashboard directly.
+> However, you'll need to keep in mind the following secrets and use them accordingly.
+
 Clone this repository:
 
 ```sh
@@ -47,7 +50,7 @@ cd run-ai-isaac
 Fill in the Run:ai server information in `secrets/env.sh` based on the information provided by the cluster admin, for example:
 
 ```
-export RUNAI_URL="https://runai.local"
+export RUNAI_URL="<RUNAI_URL>"
 export STORAGE_NODE_IP="<STORAGE_NODE_IP>"
 export FTP_USER="<FTP_USER>"
 export FTP_PASS="<FTP_PASS>"
