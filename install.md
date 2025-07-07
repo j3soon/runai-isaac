@@ -215,39 +215,7 @@ Since users are trusted to create custom Environments and Templates by themselve
    scripts/admin/create_compute.sh
    ```
 
-2. Set up the shared NFS storage.
-
-   In the storage node:
-
-   ```sh
-   sudo apt-get update
-   sudo apt-get install -y nfs-kernel-server
-
-   # TODO: Modify these according to your needs.
-   NFS_DIR=/mnt/data
-   SHARE_DIRS=( lab1 lab2 )
-
-   EXPORTS_FILE="/etc/exports"
-   for dir in "${SHARE_DIRS[@]}"; do
-     FULL_PATH="$NFS_DIR/$dir"
-     EXPORT_LINE="$FULL_PATH *(rw,sync,no_subtree_check,all_squash,no_root_squash,anonuid=1000,anongid=1000)"
-
-     sudo mkdir -p "$FULL_PATH"
-     sudo chown ubuntu:ubuntu "$FULL_PATH"
-     sudo chmod 0777 "$FULL_PATH"
-
-     if ! grep -qxF "$EXPORT_LINE" "$EXPORTS_FILE"; then
-       echo "📤 Adding export line for $FULL_PATH"
-       echo "$EXPORT_LINE" | sudo tee -a "$EXPORTS_FILE" > /dev/null
-     else
-       echo "✅ Export line already exists for $FULL_PATH"
-     fi
-   done
-   sudo exportfs -a
-   sudo service nfs-kernel-server restart
-   ```
-
-3. Set up FTPS.
+2. Set up FTPS.
 
    In the storage node:
 
@@ -409,6 +377,40 @@ Since users are trusted to create custom Environments and Templates by themselve
    References:
    - [Set up an FTP server](https://documentation.ubuntu.com/server/how-to/networking/ftp/index.html)
    - [vsftpd](https://help.ubuntu.com/community/vsftpd)
+
+3. Set up the shared NFS storage.
+
+   In the storage node:
+
+   ```sh
+   sudo apt-get update
+   sudo apt-get install -y nfs-kernel-server
+
+   # TODO: Modify these according to your needs.
+   NFS_DIR=/mnt/data
+   FTPS_USERS=( lab1 lab2 )
+
+   FTP_UID=$(id -u ftp)
+   FTP_GID=$(id -g ftp)
+   EXPORTS_FILE="/etc/exports"
+   for user in "${FTPS_USERS[@]}"; do
+     FULL_PATH="$NFS_DIR/$user"
+     EXPORT_LINE="$FULL_PATH *(rw,sync,no_subtree_check,all_squash,no_root_squash,anonuid=$FTP_UID,anongid=$FTP_GID)"
+
+     sudo mkdir -p "$FULL_PATH"
+     sudo chown $FTP_UID:$FTP_GID "$FULL_PATH"
+     sudo chmod 0777 "$FULL_PATH"
+
+     if ! grep -qxF "$EXPORT_LINE" "$EXPORTS_FILE"; then
+       echo "📤 Adding export line for $FULL_PATH"
+       echo "$EXPORT_LINE" | sudo tee -a "$EXPORTS_FILE" > /dev/null
+     else
+       echo "✅ Export line already exists for $FULL_PATH"
+     fi
+   done
+   sudo exportfs -a
+   sudo service nfs-kernel-server restart
+   ```
 
 4. Create data sources for the shared NFS storages under `Assets > Data sources` and select `NFS` as the type.
 
