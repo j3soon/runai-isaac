@@ -52,6 +52,8 @@
 
 To add these tools to your custom docker image, refer to [j3soon/dockerfile-fragments](https://github.com/j3soon/dockerfile-fragments).
 
+When using multiple tools within a single environment, the tool ports may be randomly reordered. See the [developer notes](./developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
+
 ## Isaac Sim
 
 1. (Optional) Create a docker image for [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):

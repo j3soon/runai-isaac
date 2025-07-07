@@ -215,9 +215,204 @@ Since users are trusted to create custom Environments and Templates by themselve
    scripts/admin/create_compute.sh
    ```
 
-2. Create data sources for the shared NFS storages under `Assets > Data sources` and select `NFS` as the type.
+2. Set up the shared NFS storage.
 
-   > Assuming a large NFS storage has been set up on the storage node, with FTPS (we don't use SFTP since we don't want the users to have SSH privileges) configured to allow secure user uploads and downloads. Instructions for setting up NFS and FTPS will be provided later.
+   In the storage node:
+
+   ```sh
+   sudo apt-get update
+   sudo apt-get install -y nfs-kernel-server
+
+   # TODO: Modify these according to your needs.
+   NFS_DIR=/mnt/data
+   SHARE_DIRS=( lab1 lab2 )
+
+   EXPORTS_FILE="/etc/exports"
+   for dir in "${SHARE_DIRS[@]}"; do
+     FULL_PATH="$NFS_DIR/$dir"
+     EXPORT_LINE="$FULL_PATH *(rw,sync,no_subtree_check,all_squash,no_root_squash,anonuid=1000,anongid=1000)"
+
+     sudo mkdir -p "$FULL_PATH"
+     sudo chown ubuntu:ubuntu "$FULL_PATH"
+     sudo chmod 0777 "$FULL_PATH"
+
+     if ! grep -qxF "$EXPORT_LINE" "$EXPORTS_FILE"; then
+       echo "📤 Adding export line for $FULL_PATH"
+       echo "$EXPORT_LINE" | sudo tee -a "$EXPORTS_FILE" > /dev/null
+     else
+       echo "✅ Export line already exists for $FULL_PATH"
+     fi
+   done
+   sudo exportfs -a
+   sudo service nfs-kernel-server restart
+   ```
+
+3. Set up FTPS.
+
+   In the storage node:
+
+   ```sh
+   sudo apt-get install -y vsftpd
+   echo ~ftp
+   sudo sed -i '/^#write_enable=YES/s/^#//' /etc/vsftpd.conf
+   sudo systemctl restart vsftpd.service
+   ```
+
+   and then create users:
+
+   ```sh
+   # TODO: Modify these according to your needs.
+   NFS_DIR=/mnt/data
+   FTPS_USERS=( lab1 lab2 )
+
+   sudo mkdir -p /etc/vsftpd
+   cd /etc/vsftpd
+   sudo apt-get install -y pwgen
+
+   for user in "${FTPS_USERS[@]}"; do
+     pass=$(pwgen -s 20 1)
+     echo "Creating user $user with password $pass"
+     # Take note of the password.
+     echo "$user" | sudo tee -a vusers.txt > /dev/null
+     echo "$pass" | sudo tee -a vusers.txt > /dev/null
+   done
+
+   sudo apt-get install -y db-util
+   sudo db_load -T -t hash -f vusers.txt vsftpd-virtual-user.db
+   sudo chmod 600 vsftpd-virtual-user.db # make it not global readable
+   sudo rm vusers.txt
+   ```
+
+   Update configs following [this guide](https://help.ubuntu.com/community/vsftpd#Configure_VSFTPD_for_virtual_user). Specifically:
+
+   ```sh
+   sudo tee -a /etc/vsftpd.conf > /dev/null << 'EOF'
+
+   # --- Configure VSFTPD for virtual user ---
+
+   anonymous_enable=NO
+   local_enable=YES
+   # Virtual users will use the same privileges as local users.
+   # It will grant write access to virtual users. Virtual users will use the
+   # same privileges as anonymous users, which tends to be more restrictive
+   # (especially in terms of write access).
+   virtual_use_local_privs=YES
+   write_enable=YES
+
+   # Set the name of the PAM service vsftpd will use
+   pam_service_name=vsftpd.virtual
+
+   # Activates virtual users
+   guest_enable=YES
+
+   # Automatically generate a home directory for each virtual user, based on a template.
+   # For example, if the home directory of the real user specified via guest_username is
+   # /home/virtual/$USER, and user_sub_token is set to $USER, then when virtual user vivek
+   # logs in, he will end up (usually chroot()'ed) in the directory /home/virtual/vivek.
+   # This option also takes affect if local_root contains user_sub_token.
+   user_sub_token=$USER
+
+   # Usually this is mapped to Apache virtual hosting docroot, so that
+   # Users can upload files
+   local_root=/home/vftp/$USER
+
+   # Chroot user and lock down to their home dirs
+   chroot_local_user=YES
+
+   # Hide ids from user
+   hide_ids=YES
+   EOF
+   ```
+
+   Update PAM configs following [this guide](https://help.ubuntu.com/community/vsftpd#Append_.28or_create_with.29_the_following:). Specifically:
+
+   ```sh
+   sudo tee -a /etc/pam.d/vsftpd.virtual > /dev/null << 'EOF'
+   #%PAM-1.0
+   auth       required     pam_userdb.so db=/etc/vsftpd/vsftpd-virtual-user
+   account    required     pam_userdb.so db=/etc/vsftpd/vsftpd-virtual-user
+   session    required     pam_loginuid.so
+   EOF
+   ```
+
+   Update configs following [this guide](https://help.ubuntu.com/community/vsftpd#TLS.2FSSL.2FFTPS). Specifically:
+
+   ```sh
+   sudo tee -a /etc/vsftpd.conf > /dev/null << 'EOF'
+
+   # --- TLS/SSL/FTPS ---
+
+   ssl_enable=YES
+   allow_anon_ssl=NO
+   force_local_data_ssl=YES
+   force_local_logins_ssl=YES
+   ssl_tlsv1=YES
+   ssl_sslv2=NO
+   ssl_sslv3=NO
+   # Filezilla uses port 21 if you don't set any port
+   # in Servertype "FTPES - FTP over explicit TLS/SSL"
+   # Port 990 is the default used for FTPS protocol.
+   # Uncomment it if you want/have to use port 990.
+   # listen_port=990
+   EOF
+   ```
+
+   Update users:
+
+   ```sh
+   # TODO: Modify these according to your needs.
+   NFS_DIR=/mnt/data
+   FTPS_USERS=( lab1 lab2 )
+
+   for user in "${FTPS_USERS[@]}"; do
+     sudo mkdir -p /home/vftp/$user
+     sudo chown -R ftp:ftp /home/vftp/$user
+     # Remove write permission due to security concerns (writing dot files at home directory)
+     sudo mkdir -p $NFS_DIR/$user
+     sudo chmod a-w /home/vftp/$user
+     sudo mkdir -p /home/vftp/$user/mnt/nfs
+     sudo mount --bind $NFS_DIR/$user /home/vftp/$user/mnt/nfs
+     sudo chown ftp:ftp /home/vftp/$user/mnt
+     sudo chown ftp:ftp /home/vftp/$user/mnt/nfs
+   done
+
+   sudo service vsftpd restart
+   ```
+
+   Quick test:
+
+   ```sh
+   ftp localhost
+   # Enter the username.
+
+   # Should show the following error:
+   #
+   #   530 Non-anonymous sessions must use encryption.
+   #   ftp: Login failed
+   #
+   # Ctrl+D to exit.
+   ```
+
+   ```sh
+   sudo apt install lftp -y
+   echo "set ssl:verify-certificate no" >> ~/.lftprc
+
+   echo hi > test.txt
+   lftp localhost -u <USER_NAME>
+   # and enter password
+   cd /mnt/nfs
+   put test.txt
+   ls
+   # Ctrl+D to exit.
+   ```
+
+   References:
+   - [Set up an FTP server](https://documentation.ubuntu.com/server/how-to/networking/ftp/index.html)
+   - [vsftpd](https://help.ubuntu.com/community/vsftpd)
+
+4. Create data sources for the shared NFS storages under `Assets > Data sources` and select `NFS` as the type.
+
+   > Assuming a large NFS storage has been set up on the storage node, with FTPS (we don't use SFTP since we don't want the users to have SSH privileges) configured to allow secure user uploads and downloads.
 
    ```
    Scope: runai/runai-cluster/lab1
