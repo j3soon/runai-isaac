@@ -187,6 +187,10 @@ EOF
 # Note: `--NotebookApp.password` may be used as an alternative, but it requires generating a hashed password which adds complexity
 # Ref: https://stackoverflow.com/a/77117477
 
+# =====Isaac Sim=====
+
+ENV ACCEPT_EULA=Y
+
 # Tools and scripts for Omniverse
 COPY thirdparty/omnicli /omnicli
 COPY scripts/docker/run.sh /run.sh
