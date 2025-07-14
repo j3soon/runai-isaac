@@ -187,6 +187,7 @@ Allows workload access sharing and separation within a department
 
 - Ask users to always prefix Environments, Templates, and Workloads with their unique username.
 - [Run:ai] There are currently no way to know who created a particular workload within a project through GUI.
+  > 2025/07 Update: There is a new `Created by` column in the `Workloads` tab.
 - [Run:ai] Deletion of projects require K8s `kubectl` access, no corresponding Run:ai GUI for admins (slack)
 
 ![](./assets/dev-notes-runai-workloads.png)
