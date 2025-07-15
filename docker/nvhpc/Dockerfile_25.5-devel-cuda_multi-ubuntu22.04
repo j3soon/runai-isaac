@@ -1,0 +1,18 @@
+FROM nvcr.io/nvidia/nvhpc:25.5-devel-cuda_multi-ubuntu22.04
+
+# Install Python and pip
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
+
+# Set default shell to bash
+ENV SHELL=/bin/bash
