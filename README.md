@@ -1,6 +1,6 @@
 # Running Isaac Sim Workloads on NVIDIA Run:ai
 
-A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running PyTorch, Isaac Sim, Isaac Lab, Cosmos, and more workloads on Run:ai, and (3) using SSH, VNC, Jupyter Lab, VSCode, TensorBoard, and more tools on Run:ai.
+A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running PyTorch, Isaac Sim, Isaac Lab, Cosmos, CUDA, and more workloads on Run:ai, and (3) using SSH, VNC, Jupyter Lab, VSCode, TensorBoard, Nsight Systems, Nsight Compute, and more tools on Run:ai.
 
 > For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
 
@@ -21,6 +21,7 @@ A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running
 - [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)
 - [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1)
 - [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1)
+- [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc)
 <!--
 - [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t)
 -->
