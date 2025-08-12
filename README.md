@@ -4,6 +4,12 @@ A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running
 
 > For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
 
+For new users, we strongly recommend reading this entire guide and following the instructions step by step. You can skip optional sections and ignore links unless needed.
+
+In the past, skipping this guide has led to serious issues including code and data loss when containers are terminated.
+
+Only skip the guide if you are fully confident in what you're doing. Proceed at your own risk.
+
 ## Previews
 
 | Isaac Sim | Isaac Lab |
@@ -97,6 +103,8 @@ Log in with your Run:ai account with credentials `<RUNAI_USER_EMAIL>` and `<RUNA
 You will be prompted to change your password. Make sure to take note of the new password.
 
 ## Creating Run:ai Environments and Workloads
+
+We strongly recommend following the instructions at least once to understand the cluster's logic. For example, any data stored outside the persistent NFS volume will be deleted when the container is terminated.
 
 ### Jupyter Lab with Custom Base Image
 
@@ -296,7 +304,7 @@ We take the PyTorch MNIST training code as an example.
 
     ![](./docs/assets/workload-delete.png)
 
-11. (Optional) Alternative to interactive Jupyter Lab workloads, you may want to submit a batch workload.
+11. Alternative to interactive Jupyter Lab workloads, you may want to submit a batch workload.
 
     Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Batch`.
 
@@ -338,9 +346,21 @@ We take the PyTorch MNIST training code as an example.
 
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
-For more details, please refer to [the Applications section](./docs/applications.md).
+### Running Your Workloads
 
-## FAQ
+Now that you have a basic understanding of the workflow, here are a few tips to help you work more efficiently:
+
+1. **Build and test locally first.** Always create your custom Docker image on a local Linux machine and test it there before deploying to Run:ai. This makes debugging easier and prevents wasting GPU resources on Run:ai.
+
+2. **Use persistent storage wisely.** Store all code and data in the persistent NFS volume, back them up regularly to your local machine, and remove unnecessary files to save storage space on Run:ai. To minimize performance impact, copy the dataset to the container's local storage before starting the training process, and reduce checkpointing frequency.
+
+3. **Prefer batch workloads.** When possible, use batch workloads so containers terminate automatically after tasks complete, freeing GPU resources for others.
+
+4. **Use interactive Jupyter Lab only when needed.** Reserve interactive workloads for debugging, and **always** stop or delete them when finished to release the resources. Depending on your cluster policy, idle interactive workloads may be automatically terminated without warning after a set time or during maintenance. Keeping an idle interactive workload running for days is often frowned upon, unless you have contacted the cluster admin and received explicit permission.
+
+For some sample applications, please refer to [the Applications section](./docs/applications.md).
+
+## Developer Notes & FAQ
 
 See [the Developer Notes](./docs/developer-notes.md) for more details.
 
