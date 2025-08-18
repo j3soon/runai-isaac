@@ -176,7 +176,7 @@ Allows non-preemptive GPU quota sharing across departments
 - Disable preemption saves everyone from the hassle of making their workloads preemptible.
 - > "A non-preemptible workload is only scheduled if in-quota and cannot be preempted after being scheduled, not even by a higher priority workload." -- [Run:ai Docs](https://run-ai-docs.nvidia.com/self-hosted/platform-management/runai-scheduler/scheduling/concepts-and-principles#priority-and-preemption)
 - Ask users to only use the `Workspace` type (unsure if this is necessary, will not work for multi-node workloads).
-- [Run:ai] Unsure if there’s a way to increase GPU limit to over 100 & Must set `Order of priority` to prevent scheduling issues.
+- [Run:ai] Must set `Order of priority` to prevent scheduling issues.
 
 ![](./assets/dev-notes-runai-organization-department.png)
 ![](./assets/dev-notes-runai-organization-project.png)
