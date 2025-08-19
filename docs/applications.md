@@ -48,11 +48,23 @@
    /run.sh "/usr/bin/supervisord -n"
    ```
 
-![](./assets/all-in-one-workspace.png)
+   ![](./assets/all-in-one-workspace.png)
+
+3. (Optional) Test every tools.
+
+   Open all 6 tools in the browser. You should notice that the link ports are not the same in those inside the container. For example, SSH inside the container is `22` port, but the link port may be `33333`. This is because the ports are exposed through K8s `NodePort`.
+
+   Jupyter Lab, web-based VSCode, and TensorBoard are straightforward to use. For applications that require GUI (such as Isaac Sim and Isaac Lab interactive mode), you can use the noVNC tool. It should show the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`. noVNC is the recommended tool for GUI applications, however you can also use VNC viewers to connect directly to the VNC port. Last but not least, the SSH port can connect to the container, and can also be used for local VSCode `Remote Development` feature.
+
+   > When using multiple tools within a single environment, the tool ports may be randomly reordered due to a Run:ai bug (which I believe is fixed in the latest version). See the [developer notes](./developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
+   >
+   > In this case, you can still identify the correct tool port by trial-and-error. For admins, use `kubectl get services -n runai-<PROJECT_NAME>` to bypass trial-and-error.
 
 To add these tools to your custom docker image, refer to [j3soon/dockerfile-fragments](https://github.com/j3soon/dockerfile-fragments).
 
-When using multiple tools within a single environment, the tool ports may be randomly reordered. See the [developer notes](./developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
+Before moving on, make sure you are familiar with the noVNC tool, this is required to access the following GUI applications. In addition, if planning to use interactive GUI for the following applications, the Environment Template should follow the `all-in-one` template, such as the command should use the `/run.sh "/usr/bin/supervisord -n"` command instead of those used in non-interactive jobs.
+
+Note that for the following applications, docker images without the `-ex` suffix are for non-interactive jobs, and docker images with the `-ex` suffix are for interactive jobs. The Environment Template are also different for these two types of jobs. If you encountered errors such as unable to access the VNC desktop, inspect the `all-in-one` case carefully, and make sure you have grasped the concept of the `all-in-one` docker image and Environment Template.
 
 ## Isaac Sim
 
@@ -79,7 +91,7 @@ When using multiple tools within a single environment, the tool ports may be ran
    /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py
    ```
 
-If using `isaac-sim-ex` docker image, you can use the following command to launch interactive mode:
+If using `isaac-sim-ex` docker image and similar Environment Template of `all-in-one`, you can use the following command to launch interactive mode:
 
 ```sh
 cd /isaac-sim
@@ -120,7 +132,7 @@ and then go to `Window > Examples > Robotics Examples`, in the `Robotics Example
    /workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless
    ```
 
-If using `isaac-lab-ex` docker image, you can use the following command to launch interactive mode:
+If using `isaac-lab-ex` docker image and similar Environment Template of `all-in-one`, you can use the following command to launch interactive mode:
 
 ```sh
 cd /workspace/isaaclab

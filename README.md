@@ -318,7 +318,8 @@ We take the PyTorch MNIST training code as an example.
     Environment:
       Select the environment for your workload: <YOUR_USERNAME>-pytorch-mnist
       Set a command and arguments for the container running in the pod:
-        Command: /run.sh "cd /mnt/nfs/<YOUR_USERNAME>/mnist" "python main.py --save-model --epochs 1"
+        Command:
+          /run.sh "cd /mnt/nfs/<YOUR_USERNAME>/mnist" "python main.py --save-model --epochs 1"
     Compute resource:
       Select the node resources needed to run your workload: gpu1
     Data sources:
