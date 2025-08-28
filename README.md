@@ -227,6 +227,12 @@ We take the PyTorch MNIST training code as an example.
        /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
        ```
      - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
 
    and then click `CREATE ENVIRONMENT`.
 
@@ -234,6 +240,12 @@ We take the PyTorch MNIST training code as an example.
 
    ![](./docs/assets/environments.png)
    ![](./docs/assets/environment-new.png)
+
+   <details>
+   <summary>Security settings for later versions of Run:ai (Click to expand)</summary>
+   <img src="./docs/assets/environment-new-security-partial.png">
+   </details>
+
    ![](./docs/assets/environment-created.png)
 
 5. Create a new GPU workload based on the environment.
@@ -397,7 +409,7 @@ We take the PyTorch MNIST training code as an example.
 
     and then click `CREATE WORKSPACE`.
 
-    Note that the batch workload will not automatically restart when it fails since we set the backoff limit to 1. There is currently no way to set the backoff limit to 0, so make sure a workload restart will not overwrite your previous results.
+    Note that the batch workload will automatically restart once when it fails since we set the backoff limit to 1. There is currently no way to set the backoff limit to 0, so make sure a workload restart will not overwrite your previous results.
 
     After the workload is completed, click `SHOW DETAILS` to see the logs.
 
