@@ -274,7 +274,7 @@ We take the PyTorch MNIST training code as an example.
    - Compute resource
      - Select the node resources needed to run your workload:
        ```
-       gpu1
+       gpu-x1
        ```
    - Data sources
      - Select the data sources your workload needs to access:
@@ -394,7 +394,7 @@ We take the PyTorch MNIST training code as an example.
     - Compute resource
       - Select the node resources needed to run your workload:
         ```
-        gpu1
+        gpu-x1
         ```
     - Data sources
       - Select the data sources your workload needs to access:
@@ -439,7 +439,7 @@ Now that you have a basic understanding of the workflow, here are a few tips to 
 
 4. **Use interactive Jupyter Lab only when needed.** Reserve interactive workloads for debugging, and **always** stop or delete them when finished to release the resources. Depending on your cluster policy, idle interactive workloads may be automatically terminated without warning after a set time or during maintenance. Keeping an idle interactive workload running for days is often frowned upon, unless you have contacted the cluster admin and received explicit permission.
 
-5. **Request for minimal GPU resources.** If you are not sure about the minimum GPU resources required for your task, request for minimal resources (`gpu1`) first. You can always request for more resources (e.g., `gpu2`, `gpu4`, `gpu8`) later. In addition, don't submit CPU workloads (`gpu0`, `cpu-only`) on a GPU node pool unless you have contacted the cluster admin and received explicit permission.
+5. **Request for minimal GPU resources.** If you are not sure about the minimum GPU resources required for your task, request for minimal resources (`gpu-x1`) first. You can always request for more resources (e.g., `gpu-x2`, `gpu-x4`, `gpu-x8`) later. In addition, don't submit CPU workloads (`gpu-x0`, `cpu-only`) on a GPU node pool unless you have contacted the cluster admin and received explicit permission.
 
 For some sample applications, please refer to [the Applications section](./docs/applications.md).
 

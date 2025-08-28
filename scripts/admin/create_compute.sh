@@ -33,7 +33,7 @@ for i in {0..8}; do
       --header 'Content-Type: application/json' \
       --data-raw "{
         \"meta\": {
-            \"name\": \"gpu${i}\",
+            \"name\": \"gpu-x${i}\",
             \"scope\": \"tenant\"
         },
         \"spec\": {
