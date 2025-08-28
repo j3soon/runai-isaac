@@ -457,10 +457,6 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    - Runtime settings
      - Command
        ```
-       /run.sh "/workspace/isaaclab/isaaclab.sh -p -u scripts/tutorials/00_sim/log_time.py --headless"
-       ```
-       or
-       ```
        /run.sh "/workspace/isaaclab/isaaclab.sh -p -u scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless"
        ```
        > The `-u` flag is required for correct logging by setting unbuffered mode.
