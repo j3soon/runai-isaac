@@ -447,7 +447,7 @@ Now that you have a basic understanding of the workflow, here are a few tips to 
 
 5. **Request for minimal GPU resources.** If you are not sure about the minimum GPU resources required for your task, request for minimal resources (`gpu-x1`) first. You can always request for more resources (e.g., `gpu-x2`, `gpu-x4`, `gpu-x8`) later. In addition, don't submit CPU workloads (`gpu-x0`, `cpu-only`) on a GPU node pool unless you have contacted the cluster admin and received explicit permission.
 
-For some sample applications, please refer to [the Applications section](./docs/applications.md).
+For more sample applications (such as Isaac Sim and Isaac Lab), please refer to [the Applications section](./docs/applications.md).
 
 ## Developer Notes & FAQ
 

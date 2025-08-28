@@ -70,19 +70,19 @@ We take the All-In-One workspace as a comprehensive example that includes multip
        ```
      - Tool
        ```
-       noVNC
+       Custom - noVNC
        Connection type: NodePort (Auto generate)
        Container port: 6080
        ```
      - Tool
        ```
-       TigerVNC
+       Custom - TigerVNC
        Connection type: NodePort (Auto generate)
        Container port: 5900
        ```
      - Tool
        ```
-       SSH
+       Custom - SSH
        Connection type: NodePort (Auto generate)
        Container port: 22
        ```
@@ -219,12 +219,13 @@ We take [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
    - Runtime settings
      - Command
        ```
-       /run.sh "/isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/time_stepping.py"
+       /run.sh "/isaac-sim/python.sh -u /isaac-sim/standalone_examples/api/isaacsim.core.api/time_stepping.py"
        ```
        or
        ```
-       /run.sh "/isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py"
+       /run.sh "/isaac-sim/python.sh -u /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py"
        ```
+       > The `-u` flag is required for correct logging by setting unbuffered mode.
      - Arguments: (Keep empty)
    - Security
      - Set where the UID, GID, and supplementary groups for the container should be taken from
@@ -327,7 +328,7 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
        ```
      - Tool
        ```
-       noVNC
+       Custom - noVNC
        Connection type: NodePort (Auto generate)
        Container port: 6080
        ```
@@ -456,12 +457,13 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    - Runtime settings
      - Command
        ```
-       /run.sh "/workspace/isaaclab/isaaclab.sh -p scripts/tutorials/00_sim/log_time.py --headless"
+       /run.sh "/workspace/isaaclab/isaaclab.sh -p -u scripts/tutorials/00_sim/log_time.py --headless"
        ```
        or
        ```
-       /run.sh "/workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless"
+       /run.sh "/workspace/isaaclab/isaaclab.sh -p -u scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless"
        ```
+       > The `-u` flag is required for correct logging by setting unbuffered mode.
      - Arguments: (Keep empty)
    - Security
      - Set where the UID, GID, and supplementary groups for the container should be taken from
@@ -511,6 +513,8 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
 4. Wait for the workload to finish. Inspect the logs and delete the workload after the task is completed.
 
 As you can see, this example only logs results and does not save any checkpoints or output files. For real-world workloads, make sure to place your code in the `/mnt/nfs/<YOUR_USERNAME>` directory and save any checkpoints or outputs there. This ensures your results are preserved even after the container is terminated.
+
+Basically, you'll want to store your modified Isaac Lab codebase under the `/mnt/nfs/<YOUR_USERNAME>` directory and run the workload using the scripts from `/mnt/nfs/<YOUR_USERNAME>`.
 
 ## Isaac Lab (Extended) Interactive Workspace
 
@@ -563,7 +567,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
        ```
      - Tool
        ```
-       noVNC
+       Custom - noVNC
        Connection type: NodePort (Auto generate)
        Container port: 6080
        ```
