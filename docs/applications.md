@@ -1,153 +1,651 @@
 # Sample Applications
 
+This document assumes you have already followed the [README](../README.md) and understand the basic concepts of Run:ai.
+
 Please note that interactive workloads are only for debugging, and should be stopped and deleted when finished. See [Running Your Workloads](../README.md#running-your-workloads) for the usage guidelines.
 
-## All-In-One and Extended Workspaces
+## All-In-One Interactive Workspace
 
-1. (Optional) Create a docker image for [All-In-One](https://github.com/j3soon/dockerfile-fragments/tree/main/all-in-one) Workspace:
+> You can skip this section if you plan to only submit batch workloads, such as non-interactive Isaac Sim and Isaac Lab training tasks.
+
+We take the All-In-One workspace as a comprehensive example that includes multiple tools for development and debugging.
+
+1. (Optional) Create a docker image for [All-In-One Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/all-in-one/Dockerfile):
 
    ```sh
-   # ubuntu 22.04 base
-   docker build -f docker/all-in-one/Dockerfile . -t j3soon/runai-all-in-one
+   docker build -t j3soon/runai-all-in-one -f docker/all-in-one/Dockerfile .
    docker push j3soon/runai-all-in-one
-   # isaac-sim 4.5.0
-   docker build -f docker/isaac-sim-ex/Dockerfile_4_5_0 . -t j3soon/runai-isaac-sim-ex:4.5.0
-   docker push j3soon/runai-isaac-sim-ex:4.5.0
-   # isaac-lab 2.1.0
-   docker build -f docker/isaac-lab-ex/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab-ex:2.1.0
-   docker push j3soon/runai-isaac-lab-ex:2.1.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
-2. Launch a workspace using the docker image `j3soon/runai-all-in-one`
+2. Create a new environment for your docker image.
 
-   Add 6 tools:
+   Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
 
-   ```
-   Tools:
-   - Jupyter
-     Connection type: NodePort (Auto generate)
-     Container port: 8888
-   - TensorBoard
-     Connection type: NodePort (Auto generate)
-     Container port: 6006
-   - VSCode
-     Connection type: NodePort (Auto generate)
-     Container port: 8080
-   - noVNC
-     Connection type: NodePort (Auto generate)
-     Container port: 6080
-   - TigerVNC
-     Connection type: NodePort (Auto generate)
-     Container port: 5900
-   - SSH
-     Connection type: NodePort (Auto generate)
-     Container port: 22
-   ```
+   Fill in the following fields:
 
-   Environment command:
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-all-in-one
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-all-in-one
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Tools
+     - Tool
+       ```
+       Jupyter
+       Connection type: NodePort (Auto generate)
+       Container port: 8888
+       ```
+     - Tool
+       ```
+       TensorBoard
+       Connection type: NodePort (Auto generate)
+       Container port: 6006
+       ```
+     - Tool
+       ```
+       VSCode
+       Connection type: NodePort (Auto generate)
+       Container port: 8080
+       ```
+     - Tool
+       ```
+       noVNC
+       Connection type: NodePort (Auto generate)
+       Container port: 6080
+       ```
+     - Tool
+       ```
+       TigerVNC
+       Connection type: NodePort (Auto generate)
+       Container port: 5900
+       ```
+     - Tool
+       ```
+       SSH
+       Connection type: NodePort (Auto generate)
+       Container port: 22
+       ```
+   - Runtime settings
+     - Command
+       ```
+       /run.sh "/usr/bin/supervisord -n"
+       ```
+     - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
 
-   ```
-   /run.sh "/usr/bin/supervisord -n"
-   ```
+   and then click `CREATE ENVIRONMENT`.
 
    ![](./assets/all-in-one-workspace.png)
 
-3. (Optional) Test every tools.
+3. Create a new GPU workload based on the environment.
 
-   Open all 6 tools in the browser. You should notice that the link ports are not the same in those inside the container. For example, SSH inside the container is `22` port, but the link port may be `33333`. This is because the ports are exposed through K8s `NodePort`.
+   Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
 
-   Jupyter Lab, web-based VSCode, and TensorBoard are straightforward to use. For applications that require GUI (such as Isaac Sim and Isaac Lab interactive mode), you can use the noVNC tool. It should show the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`. noVNC is the recommended tool for GUI applications, however you can also use VNC viewers to connect directly to the VNC port. Last but not least, the SSH port can connect to the container, and can also be used for local VSCode `Remote Development` feature.
+   Fill in the following fields:
+
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-all-in-one-test
+     ```
+
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-all-in-one
+       ```
+     - (Optional) Set the connection for your tool(s):
+       ```
+       Tool Access: Set to Specific user(s)
+       ```
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu-x1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
+       Attempts: 1
+       ```
+
+   and then click `CREATE WORKSPACE`.
+
+4. Connect to the tools.
+
+   In `Workload manager > Workloads`, select the workload you just created and click `CONNECT` to access various tools.
 
    > When using multiple tools within a single environment, the tool ports may be randomly reordered due to a Run:ai bug (which I believe is fixed in the latest version). See the [developer notes](./developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
    >
    > In this case, you can still identify the correct tool port by trial-and-error. For admins, use `kubectl get services -n runai-<PROJECT_NAME>` to bypass trial-and-error.
 
+5. (Optional) Test every tools.
+
+   Open all 6 tools in the browser. You should notice that the link ports are not the same in those inside the container. For example, SSH inside the container is `22` port, but the link port may be `33333`. This is because the ports are exposed through K8s `NodePort`.
+
+   Jupyter Lab, web-based VSCode, and TensorBoard are straightforward to use. For applications that require GUI (such as Isaac Sim and Isaac Lab interactive mode), you can use the noVNC tool. It should show the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`. noVNC is the recommended tool for GUI applications, however you can also use VNC viewers to connect directly to the VNC port. Last but not least, the SSH port can connect to the container, and can also be used for local VSCode `Remote Development` feature.
+
+   ![](./assets/all-in-one-workspace-novnc-remote-resizing.png)
+
+6. Delete the workload.
+
+   Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always `STOP` or `DELETE` the workload after you are done with the task to allow maximum resource utilization.
+
+Always store your data under the `/mnt/nfs/<YOUR_USERNAME>` directory to ensure your results persist even after the container is terminated.
+
 To add these tools to your custom docker image, refer to [j3soon/dockerfile-fragments](https://github.com/j3soon/dockerfile-fragments).
 
 Before moving on, make sure you are familiar with the noVNC tool, this is required to access the following GUI applications. In addition, if planning to use interactive GUI for the following applications, the Environment Template should follow the `all-in-one` template, such as the command should use the `/run.sh "/usr/bin/supervisord -n"` command instead of those used in non-interactive jobs.
 
-Note that for the following applications, docker images without the `-ex` suffix are for non-interactive jobs, and docker images with the `-ex` suffix are for interactive jobs. The Environment Template are also different for these two types of jobs. If you encountered errors such as unable to access the VNC desktop, inspect the `all-in-one` case carefully, and make sure you have grasped the concept of the `all-in-one` docker image and Environment Template.
+> Note that for the following applications, docker images without the `-ex` suffix are for non-interactive jobs, and docker images with the `-ex` suffix are for interactive jobs. The Environment Template are also different for these two types of jobs. If you encountered errors such as unable to access the VNC desktop, inspect the `all-in-one` case carefully, and make sure you have grasped the concept of the `all-in-one` docker image and Environment Template.
 
-Moving forward, you can only expose the ports of the tools you need, and hide the rest to reduce the impact of the tool reordering bug. For example, if you only need noVNC, you can expose only port 6080 in your Environment Template. This will make it easier to identify which port corresponds to which tool, since there will be fewer ports to check.
+> Moving forward, you can only expose the ports of the tools you need, and hide the rest to reduce the impact of the tool reordering bug. For example, if you only need noVNC, you can expose only port 6080 in your Environment Template. This will make it easier to identify which port corresponds to which tool, since there will be fewer ports to check.
 
-## Isaac Sim
+## Isaac Sim Headless Workspace
 
-1. (Optional) Create a docker image for [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):
+We take [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html) headless simulation as an example for batch workloads that don't require GUI interaction.
+
+1. (Optional) Create a docker image for [Isaac Sim Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-sim/Dockerfile_4_5_0) following the [installation guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html):
 
    ```sh
-   docker build -f docker/isaac-sim/Dockerfile_4_5_0 . -t j3soon/runai-isaac-sim:4.5.0
+   docker build -t j3soon/runai-isaac-sim:4.5.0 -f docker/isaac-sim/Dockerfile_4_5_0 .
    docker push j3soon/runai-isaac-sim:4.5.0
    ```
 
-2. Launch a workspace using the docker image `j3soon/runai-isaac-sim:4.5.0`
+   > This step is optional since we provide pre-built docker images on Docker Hub.
 
-   Environment command:
+2. Create a new environment for your docker image.
 
-   ```
-   /run.sh "/isaac-sim/python.sh -m pip install jupyterlab" "/isaac-sim/python.sh /isaac-sim/kit/python/bin/jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
-   ```
+   Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
 
-3. Quick Test:
+   Fill in the following fields:
+
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-isaac-sim
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-isaac-sim:4.5.0
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Runtime settings
+     - Command
+       ```
+       /run.sh "/isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/time_stepping.py"
+       ```
+       or
+       ```
+       /run.sh "/isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py"
+       ```
+     - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
+
+   and then click `CREATE ENVIRONMENT`.
+
+3. Create a new GPU workload based on the environment.
+
+   Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
+
+   Fill in the following fields:
+
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-isaac-sim-test
+     ```
+
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-isaac-sim
+       ```
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu-x1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
+       Attempts: 1
+       ```
+
+   and then click `CREATE WORKSPACE`.
+
+4. Wait for the workload to finish. Inspect the logs and delete the workload after the task is completed.
+
+As you can see, this example only logs results and does not save any checkpoints or output files. For real-world workloads, make sure to place your code in the `/mnt/nfs/<YOUR_USERNAME>` directory and save any checkpoints or outputs there. This ensures your results are preserved even after the container is terminated.
+
+## Isaac Sim (Extended) Interactive Workspace
+
+We take Isaac Sim interactive mode as an example for GUI-based simulation development and debugging.
+
+1. (Optional) Create a docker image for [Isaac Sim Extended Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-sim-ex/Dockerfile_4_5_0):
 
    ```sh
-   /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/time_stepping.py
-   # or
-   /isaac-sim/python.sh /isaac-sim/standalone_examples/api/isaacsim.core.api/simulation_callbacks.py
+   docker build -t j3soon/runai-isaac-sim-ex:4.5.0 -f docker/isaac-sim-ex/Dockerfile_4_5_0 .
+   docker push j3soon/runai-isaac-sim-ex:4.5.0
    ```
 
-If using `isaac-sim-ex` docker image and similar Environment Template of `all-in-one`, you can use the following command to launch interactive mode:
+   > This step is optional since we provide pre-built docker images on Docker Hub.
 
-```sh
-cd /isaac-sim
-ACCEPT_EULA=Y ./runapp.sh
-```
+2. Create a new environment for your docker image.
 
-and then go to `Window > Examples > Robotics Examples`, in the `Robotics Examples` window, click `POLICY > Humanoid > LOAD`.
+   Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
 
-![](./assets/preview/isaac-sim-vnc.png)
+   Fill in the following fields:
 
-## Isaac Lab
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-isaac-sim-ex
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-isaac-sim-ex:4.5.0
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Tools
+     - Tool
+       ```
+       VSCode
+       Connection type: NodePort (Auto generate)
+       Container port: 8080
+       ```
+     - Tool
+       ```
+       noVNC
+       Connection type: NodePort (Auto generate)
+       Container port: 6080
+       ```
+     - Tool
+       (Optionally [expose more ports](#all-in-one-interactive-workspace) for other tools if needed.)
+   - Runtime settings
+     - Command
+       ```
+       /run.sh "/usr/bin/supervisord -n"
+       ```
+     - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
 
-1. (Optional) Create a docker image for [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
+   and then click `CREATE ENVIRONMENT`.
+
+   > Note that the Environment Template should follow the `all-in-one` template, using the `/run.sh "/usr/bin/supervisord -n"` command instead of those used in non-interactive jobs.
+
+3. Create a new GPU workload based on the environment.
+
+   Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
+
+   Fill in the following fields:
+
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-isaac-sim-ex-test
+     ```
+
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-isaac-sim-ex
+       ```
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu-x1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
+       Attempts: 1
+       ```
+
+   and then click `CREATE WORKSPACE`.
+
+4. Connect to the noVNC tool.
+
+   In `Workload manager > Workloads`, select the workload you just created and click `CONNECT > noVNC`.
+
+   You should see the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`.
+
+5. Launch Isaac Sim interactive mode.
+
+   In the noVNC desktop, open a terminal and run:
 
    ```sh
-   docker build -f docker/isaac-lab/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab:2.1.0
+   cd /isaac-sim
+   ACCEPT_EULA=Y ./runapp.sh
+   ```
+
+   Then go to `Window > Examples > Robotics Examples`, in the `Robotics Examples` window, click `POLICY > Humanoid > LOAD`.
+
+   ![](./assets/preview/isaac-sim-vnc.png)
+
+6. Delete the workload.
+
+   Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always `STOP` or `DELETE` the workload after you are done with the task to allow maximum resource utilization.
+
+Always store your data under the `/mnt/nfs/<YOUR_USERNAME>` directory to ensure your results persist even after the container is terminated.
+
+## Isaac Lab Headless Workspace
+
+We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headless training as an example for reinforcement learning workloads that don't require GUI interaction.
+
+1. (Optional) Create a docker image for [Isaac Sim Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-sim/Dockerfile_4_5_0) following the [docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
+   ```sh
+   docker build -t j3soon/runai-isaac-lab:2.1.0 -f docker/isaac-lab/Dockerfile_2_1_0 .
    docker push j3soon/runai-isaac-lab:2.1.0
    ```
 
-2. Launch a workspace using the docker image `j3soon/runai-isaac-lab:2.1.0`
+   > This step is optional since we provide pre-built docker images on Docker Hub.
 
-   Environment command:
+2. Create a new environment for your docker image.
 
+   Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
+
+   Fill in the following fields:
+
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-isaac-lab
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-isaac-lab:2.1.0
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Runtime settings
+     - Command
+       ```
+       /run.sh "/workspace/isaaclab/isaaclab.sh -p scripts/tutorials/00_sim/log_time.py --headless"
+       ```
+       or
+       ```
+       /run.sh "/workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless"
+       ```
+     - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
+
+   and then click `CREATE ENVIRONMENT`.
+
+3. Create a new GPU workload based on the environment.
+
+   Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
+
+   Fill in the following fields:
+
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-isaac-lab-test
+     ```
+
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-isaac-lab
+       ```
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu-x1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
+       Attempts: 1
+       ```
+
+   and then click `CREATE WORKSPACE`.
+
+4. Wait for the workload to finish. Inspect the logs and delete the workload after the task is completed.
+
+As you can see, this example only logs results and does not save any checkpoints or output files. For real-world workloads, make sure to place your code in the `/mnt/nfs/<YOUR_USERNAME>` directory and save any checkpoints or outputs there. This ensures your results are preserved even after the container is terminated.
+
+## Isaac Lab (Extended) Interactive Workspace
+
+We take Isaac Lab interactive mode as an example for GUI-based reinforcement learning development and visualization.
+
+1. (Optional) Create a docker image for [Isaac Lab Extended Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-lab-ex/Dockerfile_2_1_0):
+   ```sh
+   docker build -t j3soon/runai-isaac-lab-ex:2.1.0 -f docker/isaac-lab-ex/Dockerfile_2_1_0 .
+   docker push j3soon/runai-isaac-lab-ex:2.1.0
    ```
-   /run.sh "/isaac-sim/python.sh -m pip install jupyterlab" "/isaac-sim/python.sh /isaac-sim/kit/python/bin/jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
-   ```
 
-3. [Quick test](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html#running-pre-built-isaac-lab-container):
+   > This step is optional since we provide pre-built docker images on Docker Hub.
+
+2. Create a new environment for your docker image.
+
+   Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
+
+   Fill in the following fields:
+
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-isaac-lab-ex
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-isaac-lab-ex:2.1.0
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Tools
+     - Tool
+       ```
+       VSCode
+       Connection type: NodePort (Auto generate)
+       Container port: 8080
+       ```
+     - Tool
+       ```
+       noVNC
+       Connection type: NodePort (Auto generate)
+       Container port: 6080
+       ```
+     - Tool
+       (Optionally [expose more ports](#all-in-one-interactive-workspace) for other tools if needed.)
+   - Runtime settings
+     - Command
+       ```
+       /run.sh "/usr/bin/supervisord -n"
+       ```
+     - Arguments: (Keep empty)
+   - Security
+     - Set where the UID, GID, and supplementary groups for the container should be taken from
+       ```
+       From the image
+       ```
+       > In newer versions of Run:ai, the default value may be `From the IdP token`.
+
+   and then click `CREATE ENVIRONMENT`.
+
+   > Note that the Environment Template should follow the `all-in-one` template, using the `/run.sh "/usr/bin/supervisord -n"` command instead of those used in non-interactive jobs.
+
+3. Create a new GPU workload based on the environment.
+
+   Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
+
+   Fill in the following fields:
+
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-isaac-lab-ex-test
+     ```
+
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-isaac-lab-ex
+       ```
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu-x1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
+       Attempts: 1
+       ```
+
+   and then click `CREATE WORKSPACE`.
+
+4. Connect to the noVNC tool.
+
+   In `Workload manager > Workloads`, select the workload you just created and click `CONNECT > noVNC`.
+
+   You should see the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`.
+
+5. Run Isaac Lab interactive examples.
+
+   In the noVNC desktop, open a terminal and run:
 
    ```sh
-   /workspace/isaaclab/isaaclab.sh -p scripts/tutorials/00_sim/log_time.py --headless
-   # View the logs and press Ctrl+C to stop
+   cd /workspace/isaaclab
+   ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Rough-H1-v0 --num_envs 32 --use_pretrained_checkpoint
    ```
 
-4. [Train Cartpole](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/rl_existing_scripts.html):
+   You can change the `--num_envs` to a larger number such as `4096`.
 
-   ```sh
-   /workspace/isaaclab/isaaclab.sh -p scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless
-   ```
+   ![](./assets/preview/isaac-lab-vnc.png)
 
-If using `isaac-lab-ex` docker image and similar Environment Template of `all-in-one`, you can use the following command to launch interactive mode:
+6. Delete the workload.
 
-```sh
-cd /workspace/isaaclab
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Rough-H1-v0 --num_envs 32 --use_pretrained_checkpoint
-```
+   Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always `STOP` or `DELETE` the workload after you are done with the task to allow maximum resource utilization.
 
-You can change the `--num_envs` to a larger number such as `4096`.
-
-![](./assets/preview/isaac-lab-vnc.png)
+Always store your data under the `/mnt/nfs/<YOUR_USERNAME>` directory to ensure your results persist even after the container is terminated.
 
 ## Isaac GR00T
 

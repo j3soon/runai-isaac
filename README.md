@@ -370,9 +370,7 @@ We take the PyTorch MNIST training code as an example.
 
 10. Delete the workload.
 
-    Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always delete the workload after you are done with the task to allow maximum resource utilization.
-
-    Also note that clicking `STOP` will also delete the container. You won't want to click this button in most cases.
+    Go to `Workload manager > Workloads` and select the workload you just created and click `DELETE`. Please always `STOP` or `DELETE` the workload after you are done with the task to allow maximum resource utilization.
 
     ![](./docs/assets/workload-delete.png)
 
