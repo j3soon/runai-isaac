@@ -120,6 +120,8 @@ You will be prompted to change your password. Make sure to take note of the new 
 
 We strongly recommend following the instructions at least once to understand the cluster's logic. For example, any data stored outside the persistent NFS volume will be deleted when the container is terminated.
 
+Pre-built Docker images for Isaac Sim, Isaac Lab, and other applications are described at the end of this document. However, we recommend following the instructions below at least once to familiarize yourself with the workflow.
+
 ### Jupyter Lab with Custom Base Image
 
 We take the PyTorch MNIST training code as an example.
@@ -143,7 +145,13 @@ We take the PyTorch MNIST training code as an example.
    docker build -t j3soon/runai-pytorch-mnist -f docker/pytorch-mnist/Dockerfile .
    docker push j3soon/runai-pytorch-mnist
    ```
+
+   > Note that this step is optional if you are using our pre-built Docker images.
+
+   It is highly recommended to build your custom Docker images in a Linux environment (with [NVIDIA Driver](https://ubuntu.com/server/docs/nvidia-drivers-installation), [Docker](https://docs.docker.com/engine/install/ubuntu/), and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed). Building on Windows is strongly discouraged for beginners unless you know exactly what you are doing.
+
    In this example, dependencies are not installed in the Dockerfile. However, in practice, you will want to select a suitable base image and pre-install all dependencies in the Dockerfile such as `pip install -r requirements.txt` to prevent the need of installing dependencies every time after launching a container. You may also want to delete the `.dockerignore` file. In addition, ensure that you always copy the `run.sh` file and the `omnicli` directory directly to the root directory (`/`) without any modifications, rather than placing them in other subdirectories. Failing to do so will result in errors, as the script relies on absolute paths. As a side note, if your code will not be modified, you can also directly copy the code to your Docker image. However, this is usually not the case, as you often want to update your code without rebuilding the Docker image.
+
 3. Upload your dataset and code to storage node through FTP.
 
    This could be done by either [FileZilla](https://filezilla-project.org/download.php?show_all=1) or `lftp`.
