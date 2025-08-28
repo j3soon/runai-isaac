@@ -190,23 +190,43 @@ We take the PyTorch MNIST training code as an example.
 
    Go to `Workload manager > Assets > Environments` and click `+ NEW ENVIRONMENT`.
 
-   ```
-   Scope: runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
-   Environment name: <YOUR_USERNAME>-pytorch-mnist
-   Select the type of workload that can use this environment:
-     Workspace: (Checked)
-     Training: (Unchecked)
-     Inference: (Unchecked)
-   Image:
-     Image URL: j3soon/runai-pytorch-mnist
-     Image pull policy: Always pull the image from the registry
-   Tools:
-     Tool: Jupyter
-   Runtime settings:
-     Command:
+   Fill in the following fields:
+
+   - Scope
+     ```
+     runai/runai-cluster/<YOUR_LAB>/<YOUR_PROJECT>
+     ```
+   - Environment name
+     ```
+     <YOUR_USERNAME>-pytorch-mnist
+     ```
+   - Workload architecture & type
+     - Select the type of workload that can use this environment:
+       ```
+       Workspace: ✅ (Checked)
+       Training: ⬜ (Unchecked)
+       Inference: ⬜ (Unchecked)
+       ```
+   - Image
+     - Image URL
+       ```
+       j3soon/runai-pytorch-mnist
+       ```
+     - Image pull policy
+       ```
+       Always pull the image from the registry
+       ```
+   - Tools
+     - Tool
+       ```
+       Jupyter
+       ```
+   - Runtime settings
+     - Command
+       ```
        /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
-     Arguments: (Empty)
-   ```
+       ```
+     - Arguments: (Keep empty)
 
    and then click `CREATE ENVIRONMENT`.
 
@@ -220,25 +240,40 @@ We take the PyTorch MNIST training code as an example.
 
    Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
 
-   ```
-   Workspace name: <YOUR_USERNAME>-pytorch-mnist-test1
-   ```
+   Fill in the following fields:
 
-   and click `CONTINUE`.
+   - Workspace name
+     ```
+     <YOUR_USERNAME>-pytorch-mnist-test1
+     ```
 
-   ```
-   Environment:
-     Select the environment for your workload: <YOUR_USERNAME>-pytorch-mnist
-     Set the connection for your tool(s):
-       (Optional) Jupyter Access: Set to Specific user(s)
-   Compute resource:
-     Select the node resources needed to run your workload: gpu1
-   Data sources:
-     Select the data sources your workload needs to access: <YOUR_LAB>-nfs
-   General:
-     Set the backoff limit before workload failure:
+     and click `CONTINUE`.
+
+   - Environment
+     - Select the environment for your workload:
+       ```
+       <YOUR_USERNAME>-pytorch-mnist
+       ```
+     - (Optional) Set the connection for your tool(s):
+       ```
+       Jupyter Access: Set to Specific user(s)
+       ```
+       > This optional step is not included in the screenshot below.
+   - Compute resource
+     - Select the node resources needed to run your workload:
+       ```
+       gpu1
+       ```
+   - Data sources
+     - Select the data sources your workload needs to access:
+       ```
+       <YOUR_LAB>-nfs
+       ```
+   - General
+     - Set the backoff limit before workload failure:
+       ```
        Attempts: 1
-   ```
+       ```
 
    and then click `CREATE WORKSPACE`.
 
@@ -325,26 +360,40 @@ We take the PyTorch MNIST training code as an example.
 
     Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
 
-    ```
-    Workspace name: <YOUR_USERNAME>-pytorch-mnist-test2
-    ```
+    Fill in the following fields:
 
-    and click `CONTINUE`.
+    - Workspace name
+      ```
+      <YOUR_USERNAME>-pytorch-mnist-test2
+      ```
 
-    ```
-    Environment:
-      Select the environment for your workload: <YOUR_USERNAME>-pytorch-mnist
-      Set a command and arguments for the container running in the pod:
-        Command:
+      and click `CONTINUE`.
+
+    - Environment
+      - Select the environment for your workload:
+        ```
+        <YOUR_USERNAME>-pytorch-mnist
+        ```
+      - Set a command and arguments for the container running in the pod:
+        - Command
+          ```
           /run.sh "cd /mnt/nfs/<YOUR_USERNAME>/mnist" "python main.py --save-model --epochs 1"
-    Compute resource:
-      Select the node resources needed to run your workload: gpu1
-    Data sources:
-      Select the data sources your workload needs to access: <YOUR_LAB>-nfs
-    General:
-      Set the backoff limit before workload failure:
+          ```
+    - Compute resource
+      - Select the node resources needed to run your workload:
+        ```
+        gpu1
+        ```
+    - Data sources
+      - Select the data sources your workload needs to access:
+        ```
+        <YOUR_LAB>-nfs
+        ```
+    - General
+      - Set the backoff limit before workload failure:
+        ```
         Attempts: 1
-    ```
+        ```
 
     and then click `CREATE WORKSPACE`.
 
