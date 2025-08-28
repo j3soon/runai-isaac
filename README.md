@@ -353,11 +353,13 @@ Now that you have a basic understanding of the workflow, here are a few tips to 
 
 1. **Build and test locally first.** Always create your custom Docker image on a local Linux machine and test it there before deploying to Run:ai. This makes debugging easier and prevents wasting GPU resources on Run:ai.
 
-2. **Use persistent storage wisely.** Store all code and data in the persistent NFS volume, back them up regularly to your local machine, and remove unnecessary files to save storage space on Run:ai. To minimize performance impact, copy the dataset to the container's local storage before starting the training process, and reduce checkpointing frequency.
+2. **Use persistent storage wisely.** Store all code and data in the persistent NFS volume, back them up regularly to your local machine, and remove unnecessary files to save shared storage space on Run:ai. To minimize performance impact, copy the dataset to the container's local storage before starting the training process, and reduce checkpointing frequency.
 
 3. **Prefer batch workloads.** When possible, use batch workloads so containers terminate automatically after tasks complete, freeing GPU resources for others.
 
 4. **Use interactive Jupyter Lab only when needed.** Reserve interactive workloads for debugging, and **always** stop or delete them when finished to release the resources. Depending on your cluster policy, idle interactive workloads may be automatically terminated without warning after a set time or during maintenance. Keeping an idle interactive workload running for days is often frowned upon, unless you have contacted the cluster admin and received explicit permission.
+
+5. **Request for minimal GPU resources.** If you are not sure about the minimum GPU resources required for your task, request for minimal resources (`gpu1`) first. You can always request for more resources (e.g., `gpu2`, `gpu4`, `gpu8`) later. In addition, don't submit CPU workloads (`gpu0`, `cpu-only`) on a GPU node pool unless you have contacted the cluster admin and received explicit permission.
 
 For some sample applications, please refer to [the Applications section](./docs/applications.md).
 
