@@ -2,7 +2,7 @@
 
 A comprehensive guide for (1) setting up Run:ai with helper scripts, (2) running PyTorch, Isaac Sim, Isaac Lab, Cosmos, CUDA, and more workloads on Run:ai, and (3) using SSH, VNC, Jupyter Lab, VSCode, TensorBoard, Nsight Systems, Nsight Compute, and more tools on Run:ai.
 
-> For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together.
+> For running Isaac Sim workloads on Omniverse Farm, please refer to [j3soon/omni-farm-isaac](https://github.com/j3soon/omni-farm-isaac). These two workload managers can be used together. Adding a Run:ai project with name `ov-farm` will allow Run:ai to act as a scheduler for Omniverse Farm.
 
 For new users, we strongly recommend reading this entire guide and following the instructions step by step. You can skip optional sections and ignore links unless needed.
 
@@ -32,15 +32,29 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 - [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t)
 -->
 
-See [the Applications section](./docs/applications.md) for more usage details.
+See [the Applications section](./docs/applications.md) for more example applications.
+
+> Please skip this section during your first read.
 
 ## Supported Tools
 
-See [the Tools section](./docs/tools.md) for more details.
+- SSH
+- VNC
+- Jupyter Lab
+- VSCode
+- TensorBoard
+- Nsight Systems
+- Nsight Compute
+
+See [the Tools section](./docs/tools.md) for more tool details.
+
+> Please skip this section during your first read.
 
 ## Installing Run:ai
 
 For cluster admins, please refer to [install.md](install.md).
+
+> Skip this section if you are a normal user.
 
 ## Setup
 
@@ -189,7 +203,8 @@ We take the PyTorch MNIST training code as an example.
    Tools:
      Tool: Jupyter
    Runtime settings:
-     Command: /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
+     Command:
+       /run.sh "pip install jupyterlab" "jupyter lab --ip=0.0.0.0 --no-browser --allow-root --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token='' --notebook-dir=/"
      Arguments: (Empty)
    ```
 
@@ -226,6 +241,8 @@ We take the PyTorch MNIST training code as an example.
    ```
 
    and then click `CREATE WORKSPACE`.
+
+   > Make sure to not accidentally select the default `jupyter-lab` environment. If you do, you'll see a `jovyan` user instead of `root`. In such case, recreate the workload with the correct environment `<YOUR_USERNAME>-pytorch-mnist`.
 
    > In our case, we didn't limit the Jupyter access to specific users, so anyone can access the Jupyter Lab.
 
@@ -306,7 +323,7 @@ We take the PyTorch MNIST training code as an example.
 
 11. Alternative to interactive Jupyter Lab workloads, you may want to submit a batch workload.
 
-    Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Batch`.
+    Go to `Workload manager > Workloads` and click `+ NEW WORKLOAD > Workspace`.
 
     ```
     Workspace name: <YOUR_USERNAME>-pytorch-mnist-test2
@@ -342,6 +359,8 @@ We take the PyTorch MNIST training code as an example.
     ![](./docs/assets/workload-running-batch.png)
     ![](./docs/assets/workload-completed-batch.png)
     ![](./docs/assets/workload-show-details-batch.png)
+
+12. Similar to the interactive workload, you should see the checkpoint and output files at `/mnt/nfs/<YOUR_USERNAME>/mnist/mnist_cnn.pt` through FTP.
 
 > Make sure to always add your username as a prefix to your environment name and workload name. This helps preventing others from accidentally modifying your setups.
 

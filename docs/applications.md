@@ -1,5 +1,7 @@
 # Sample Applications
 
+Please note that interactive workloads are only for debugging, and should be stopped and deleted when finished. See [Running Your Workloads](../README.md#running-your-workloads) for the usage guidelines.
+
 ## All-In-One and Extended Workspaces
 
 1. (Optional) Create a docker image for [All-In-One](https://github.com/j3soon/dockerfile-fragments/tree/main/all-in-one) Workspace:
@@ -15,6 +17,8 @@
    docker build -f docker/isaac-lab-ex/Dockerfile_2_1_0 . -t j3soon/runai-isaac-lab-ex:2.1.0
    docker push j3soon/runai-isaac-lab-ex:2.1.0
    ```
+
+   > This step is optional since we provide pre-built docker images on Docker Hub.
 
 2. Launch a workspace using the docker image `j3soon/runai-all-in-one`
 
