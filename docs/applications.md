@@ -182,6 +182,8 @@ We take [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
    ```sh
    docker build -t j3soon/runai-isaac-sim:4.5.0 -f docker/isaac-sim/Dockerfile_4_5_0 .
    docker push j3soon/runai-isaac-sim:4.5.0
+   docker build -t j3soon/runai-isaac-sim:5.0.0 -f docker/isaac-sim/Dockerfile_5_0_0 .
+   docker push j3soon/runai-isaac-sim:5.0.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
@@ -285,6 +287,8 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
    ```sh
    docker build -t j3soon/runai-isaac-sim-ex:4.5.0 -f docker/isaac-sim-ex/Dockerfile_4_5_0 .
    docker push j3soon/runai-isaac-sim-ex:4.5.0
+   docker build -t j3soon/runai-isaac-sim-ex:5.0.0 -f docker/isaac-sim-ex/Dockerfile_5_0_0 .
+   docker push j3soon/runai-isaac-sim-ex:5.0.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
@@ -420,6 +424,8 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    ```sh
    docker build -t j3soon/runai-isaac-lab:2.1.0 -f docker/isaac-lab/Dockerfile_2_1_0 .
    docker push j3soon/runai-isaac-lab:2.1.0
+   docker build -t j3soon/runai-isaac-lab:2.2.0 -f docker/isaac-lab/Dockerfile_2_2_0 .
+   docker push j3soon/runai-isaac-lab:2.2.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
@@ -520,6 +526,8 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
    ```sh
    docker build -t j3soon/runai-isaac-lab-ex:2.1.0 -f docker/isaac-lab-ex/Dockerfile_2_1_0 .
    docker push j3soon/runai-isaac-lab-ex:2.1.0
+   docker build -t j3soon/runai-isaac-lab-ex:2.2.0 -f docker/isaac-lab-ex/Dockerfile_2_2_0 .
+   docker push j3soon/runai-isaac-lab-ex:2.2.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.

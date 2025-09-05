@@ -19,12 +19,18 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 
 ## Pre-built Docker Images
 
+> Please skip this section during your first read.
+
 - [j3soon/runai-all-in-one](https://hub.docker.com/r/j3soon/runai-all-in-one)
 - [j3soon/runai-pytorch-mnist](https://hub.docker.com/r/j3soon/runai-pytorch-mnist)
 - [j3soon/runai-isaac-sim:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)
+- [j3soon/runai-isaac-sim:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)
 - [j3soon/runai-isaac-sim-ex:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)
+- [j3soon/runai-isaac-sim-ex:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)
 - [j3soon/runai-isaac-lab:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)
+- [j3soon/runai-isaac-lab:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)
 - [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)
+- [j3soon/runai-isaac-lab-ex:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)
 - [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1)
 - [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1)
 - [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc)
@@ -34,9 +40,9 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 
 See [the Applications section](./docs/applications.md) for more example applications.
 
-> Please skip this section during your first read.
-
 ## Supported Tools
+
+> Please skip this section during your first read.
 
 - SSH
 - VNC
@@ -48,13 +54,11 @@ See [the Applications section](./docs/applications.md) for more example applicat
 
 See [the Tools section](./docs/tools.md) for more tool details.
 
-> Please skip this section during your first read.
-
 ## Installing Run:ai
 
-For cluster admins, please refer to [install.md](install.md).
-
 > Skip this section if you are a normal user.
+
+For cluster admins, please refer to [install.md](install.md).
 
 ## Setup
 
