@@ -115,7 +115,7 @@ EOF
 # =====TigerVNC=====
 
 # Install XFCE
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     xfce4 \
     && rm -rf /var/lib/apt/lists/*
 # Fix "Failed to execute default terminal emulator. Input/output error."
