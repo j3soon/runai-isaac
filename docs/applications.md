@@ -828,6 +828,8 @@ CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python scripts/test_environment.py
    - SYS_ADMIN
    ```
 
+   ![](./assets/nsys-security-sys-admin.png)
+
    Reference: [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#container-and-scheduler-support)
 
 3. Run the following in Jupyter Lab terminal:
