@@ -6,6 +6,10 @@ Note that K8s with GPU operator can be easily installed using [NVIDIA Cloud Nati
 
 > Tested on Run:ai v2.20.29.
 
+To upgrade to the latest version, follow the [upgrade guide](https://run-ai-docs.nvidia.com/self-hosted/getting-started/installation/upgrade).
+
+> Currently testing v2.22.52.
+
 ## Run:ai Configuration
 
 ### Resources
