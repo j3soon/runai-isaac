@@ -396,7 +396,7 @@ Apply the following patch:
 kubectl patch RunaiConfig runai -n runai --type=merge -p '{"spec":{"workload-controller":{"externalAuthUrlEnabled": false}}}'
 ```
 
-> Details to be confirmed.
+> Details to be confirmed. The issue seems to be some sidecar container cannot be started successfully, which could be fixed after applying the patch.
 
 ### Run:ai Dashboard Connection Issue
 
