@@ -4,11 +4,18 @@ Follow [the self-hosted installation guide](https://run-ai-docs.nvidia.com/guide
 
 Note that K8s with GPU operator can be easily installed using [NVIDIA Cloud Native Stack](https://github.com/NVIDIA/cloud-native-stack).
 
-> Tested on Run:ai v2.20.29.
+> Tested on Run:ai `v2.20.29`, `v2.22.52`.
 
 To upgrade to the latest version, follow the [upgrade guide](https://run-ai-docs.nvidia.com/self-hosted/getting-started/installation/upgrade).
 
-> Currently testing v2.22.52.
+Specificallym, if your current version is 2.17 or higher, run:
+
+```sh
+helm get values runai-backend -n runai-backend > runai_control_plane_values.yaml
+helm upgrade runai-backend -n runai-backend runai-backend/control-plane --version "<VERSION>" -f runai_control_plane_values.yaml --reset-then-reuse-values
+```
+
+> Currently testing v2.22.64.
 
 ## Run:ai Configuration
 

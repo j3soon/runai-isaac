@@ -435,6 +435,8 @@ We take the PyTorch MNIST training code as an example.
 
 > Make sure to always add your username as a prefix to your environment name and workload name. This helps preventing others from accidentally modifying your setups.
 
+> For downloading large files or directories, consider using `tar` with `pigz` to compress the files in parallel. See [`tar + pigz`](https://stackoverflow.com/a/17110941/3917161) and [`tar + pv + pigz`](https://stackoverflow.com/questions/12313242/utilizing-multi-core-for-targzip-bzip-compression-decompression#comment70396886_17110941) for examples.
+
 > As a side note, you may want to use [Wandb](https://wandb.ai/site/) to [log](https://docs.wandb.ai/ref/python/log/) your training results. This allows you to visualize your training progress of all your workloads in a single dashboard.
 
 ### Running Your Workloads

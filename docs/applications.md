@@ -912,3 +912,12 @@ CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python scripts/test_environment.py
    This should output a `report.ncu-rep` file, which can be opened with Nsight Compute GUI.
 
    Reference: [Nsight Compute Documentation](https://docs.nvidia.com/nsight-compute/index.html)
+
+## Jupyter Lab
+
+For Docker images that have Jupyter Lab installed, you can skip adding the `/run.sh` scripts and directly launch Jupyter Lab by setting the following in your environment command:
+
+```sh
+jupyter lab
+--allow-root --ip=0.0.0.0 --no-browser --notebook-dir=/ --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token=''
+```
