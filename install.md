@@ -4,18 +4,18 @@ Follow [the self-hosted installation guide](https://run-ai-docs.nvidia.com/guide
 
 Note that K8s with GPU operator can be easily installed using [NVIDIA Cloud Native Stack](https://github.com/NVIDIA/cloud-native-stack).
 
-> Tested on Run:ai `v2.20.29`, `v2.22.52`, `v2.22.64`.
+> Tested on Run:ai `v2.20.29`, `v2.22.52`, `v2.22.64`, `v2.22.66`.
 
 To upgrade to the latest version, follow the [upgrade guide](https://run-ai-docs.nvidia.com/self-hosted/getting-started/installation/upgrade).
 
-Specificallym, if your current version is 2.17 or higher, run:
+Specifically, if your current version is 2.17 or higher, run:
 
 ```sh
 helm get values runai-backend -n runai-backend > runai_control_plane_values.yaml
 helm upgrade runai-backend -n runai-backend runai-backend/control-plane --version "<VERSION>" -f runai_control_plane_values.yaml --reset-then-reuse-values
 ```
 
-> Currently testing v2.22.66.
+> Currently testing v2.23.23.
 
 ## Run:ai Configuration
 
@@ -138,7 +138,7 @@ To simplify the user creation process, we can use [the Runai API](https://api-do
 1. Create a new Application under Applications section.
 
    ```
-   Application name: admin-cli
+   Application name: admin-app
    ```
 
    and save the `Client ID` and `Client secret` to the `secrets/env.sh` file.
@@ -193,6 +193,7 @@ Since users are trusted to create custom Environments and Templates by themselve
 
    ```sh
    # TODO: Modify these according to your needs.
+   # Also make sure to copy the printed passwords of each FTPS user.
    NFS_DIR=/mnt/data
    FTPS_USERS=( lab1 lab2 )
 
@@ -328,6 +329,7 @@ Since users are trusted to create custom Environments and Templates by themselve
    sudo apt install lftp -y
    echo "set ssl:verify-certificate no" >> ~/.lftprc
 
+   cd ~
    echo hi > test.txt
    lftp localhost -u <USER_NAME>
    # and enter password
@@ -383,13 +385,13 @@ Since users are trusted to create custom Environments and Templates by themselve
    Scope: runai/runai-cluster/lab1
    Data source name: lab1-nfs
    NFS server (host name or host IP): <STORAGE_NODE_IP>
-   Mount path: /mnt/nfs/lab1
+   NFS path: /mnt/nfs/lab1
    Container path: /mnt/nfs
    ---
    Scope: runai/runai-cluster/lab2
    Data source name: lab2-nfs
    NFS server (host name or host IP): <STORAGE_NODE_IP>
-   Mount path: /mnt/nfs/lab2
+   NFS path: /mnt/nfs/lab2
    Container path: /mnt/nfs
    ```
 
