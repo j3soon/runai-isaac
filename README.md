@@ -296,7 +296,7 @@ We take the PyTorch MNIST training code as an example.
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.
@@ -414,12 +414,10 @@ We take the PyTorch MNIST training code as an example.
     - General
       - Set the backoff limit before workload failure:
         ```
-        Attempts: 1
+        Attempts: 0
         ```
 
     and then click `CREATE WORKSPACE`.
-
-    Note that the batch workload will automatically restart once when it fails since we set the backoff limit to 1. There is currently no way to set the backoff limit to 0, so make sure a workload restart will not overwrite your previous results.
 
     After the workload is completed, click `SHOW DETAILS` to see the logs.
 

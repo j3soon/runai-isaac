@@ -503,20 +503,6 @@ spec:
   ...
 ```
 
-### Backoff Limit
-
-The minimal backoff limit that can be set on the GUI is 1.
-
-```
-# kubectl describe RunaiJob -n runai-lab1-default-project | grep "Backoff Limit:"
-  Backoff Limit:                                1
-  Backoff Limit:                                6
-```
-
-In the future, we want to change the minimal backoff limit to 0. When a training job fails after running for several days, users may prefer to manually resume the job using a different script rather than having it automatically retry. Automatic retries could potentially overwrite existing checkpoints and waste compute resources.
-
-While well-designed training workloads should support preemption and automatic checkpoint resumption, we have decided not to impose these requirements on users. This allows them to work in a non-preemptive environment without the burden of implementing resumption capabilities.
-
 ### Show GPU usage across nodes
 
 ```sh

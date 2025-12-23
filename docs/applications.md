@@ -138,7 +138,7 @@ We take the All-In-One workspace as a comprehensive example that includes multip
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.
@@ -269,7 +269,7 @@ We take [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.
@@ -386,7 +386,7 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.
@@ -507,7 +507,7 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.
@@ -625,7 +625,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
    - General
      - Set the backoff limit before workload failure:
        ```
-       Attempts: 1
+       Attempts: 0
        ```
 
    and then click `CREATE WORKSPACE`.

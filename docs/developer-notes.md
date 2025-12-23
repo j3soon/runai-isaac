@@ -15,12 +15,10 @@ Ensure pulling latest container image when creating new workload
 
 ### Set Minimal Backoff Limit for Non-resumable Tasks
 
-Auto-restarting is often not preferred for quick experiments
+Auto-restarting is often not preferred for quick experiments.
 
 - Often, we just want to quickly train some code (without setting up checkpointing and resuming) or reproduce work from GitHub without having to implement resuming logic.
 - Automatically restarting these workload may cause checkpoint overwrites and excessive GPU usage (e.g., submitting 20 workloads that runs 3-days each being restarted six times without producing any useful results)
-- [Run:ai] Default backoff limit is 6. Current minimum is 1, should be changed to 0 in later versions. (slack)
-- [Omniverse Farm] We’re still using OV Farm (with patch) for running batch workloads for now.
 
 ![](./assets/dev-notes-runai-workspace-backofflimit.png)
 
