@@ -189,6 +189,15 @@ Since users are trusted to create custom Environments and Templates by themselve
    sudo systemctl restart vsftpd.service
    ```
 
+   check that the NFS directory is mounted correctly (mounted to the largest RAID disk):
+
+   ```sh
+   # TODO: Modify these according to your needs.
+   NFS_DIR=/mnt/data
+
+   df -BT
+   ```
+
    and then create users:
 
    ```sh
