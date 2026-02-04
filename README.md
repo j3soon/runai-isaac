@@ -319,6 +319,10 @@ We take the PyTorch MNIST training code as an example.
    ![](./docs/assets/workload-connect-jupyter.png)
    ![](./docs/assets/jupyter-lab.png)
 
+   > If you encounter a `404` error when accessing Jupyter Lab, click the Jupyter Lab logo at the top to go to the home page.
+   >
+   > ![](./docs/assets/jupyter-lab-404.png)
+
 7. Extract the dataset.
 
    In the Jupyter Lab terminal, run:
