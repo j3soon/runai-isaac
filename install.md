@@ -402,6 +402,30 @@ Since users are trusted to create custom Environments and Templates by themselve
    Container path: /mnt/nfs
    ```
 
+## Docker Login
+
+If you have many users submitting workloads, you may hit the Docker Hub rate limit of pulling images. To avoid this, create a dedicated Docker Hub account and configure Docker login in Run:ai. (Do not use your personal Docker Hub account to prevent potential credential leakage.)
+
+In `Workload manager > Credentials > + NEW CREDENTIAL`, create a new cluster-wide credential with the following settings:
+
+```
+Scope: runai/runai-cluster
+Credential name: docker-hub-login
+Secret
+  Type: New secret
+  Username: <DOCKER_HUB_USERNAME>
+  Password: <DOCKER_HUB_PASSWORD>
+  Docker registry URL: docker.io
+```
+
+Example error message of a workload hitting the Docker Hub rate limit:
+
+```
+Failed Warning kubelet Pod 
+Failed to pull image "j3soon/test:latest": failed to pull and unpack image "docker.io/j3soon/test:latest": failed to copy: httpReadSeeker: failed open: unexpected status from GET request to https://registry-1.docker.io/v2/j3soon/test/manifests/sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: 429 Too Many Requests
+toomanyrequests: You have reached your unauthenticated pull rate limit. https://www.docker.com/increase-rate-limit
+```
+
 ## K8s Patches
 
 ### Workload Cannot Launch Successfully
