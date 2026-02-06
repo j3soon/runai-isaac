@@ -13,6 +13,14 @@ Ensure pulling latest container image when creating new workload
 
 ![](./assets/dev-notes-runai-environment-always-pull-image.png)
 
+### Set Security `From the image` for root Access
+
+Many Docker images assume a default container user.
+
+- This prevents the user from not being able to launch containers that require root access. (e.g., Isaac Sim 5.0.0)
+- [Run:ai] Default setting changed to `From the IdP token` for some version after Run:ai v2.20.29.
+- [Alternative] If have security concerns, follow the unofficial Isaac Sim [rootless containers](https://github.com/j3soon/docker-isaac-sim).
+
 ### Set Minimal Backoff Limit for Non-resumable Tasks
 
 Auto-restarting is often not preferred for quick experiments.
@@ -40,6 +48,8 @@ Happens when using multiple tools within a single environment
 - [Run:ai] When using multiple tools within a single environment, the tool ports may be randomly reordered. (slack)
 
 ![](./assets/tools-runai-connect.png)
+
+> This should be fixed in the latest version.
 
 ### Add Script to Chain Multiple Commands
 
@@ -136,6 +146,15 @@ RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
 RUN sed -i 's/\r$//' /run.sh
 ```
 
+### Add `SYS_ADMIN` capability for NSight Systems
+
+Default has no additional capabilities
+
+- [NSight Systems] Requires `SYS_ADMIN` capability to work.
+- NSight Systems is useful for overall profiling, such as for NVIDIA Warp kernels.
+
+For more details, see [this section](./applications.md#nvhpc).
+
 ### Disable Ownership Change for Tar Extract on NFS
 
 Tar changes ownership by default, which is not allowed on NFS
@@ -167,6 +186,8 @@ Prevents GPU resource fragmentation (maximize GPU utilization)
 
 ### Keep Over-quota Disabled and Over-subscribe GPUs
 
+> This is optional.
+
 Allows non-preemptive GPU quota sharing across departments
 
 - Setup was chosen despite [Run:ai's recommendation against it](https://run-ai-docs.nvidia.com/self-hosted/platform-management/aiinitiatives/adapting-ai-initiatives#assigning-your-resources), due to the following reasons:
@@ -179,9 +200,9 @@ Allows non-preemptive GPU quota sharing across departments
 ![](./assets/dev-notes-runai-organization-department.png)
 ![](./assets/dev-notes-runai-organization-project.png)
 
-### Single Project within a Department and Adopt Workload Prefix
+### Adopt Workload Prefix
 
-Allows workload access sharing and separation within a department
+Allows workload access sharing and separation within a project
 
 - Ask users to always prefix Environments, Templates, and Workloads with their unique username.
 - [Run:ai] There are currently no way to know who created a particular workload within a project through GUI.
@@ -221,6 +242,15 @@ To allow easy file sharing across users within a department
 - [Admin] We use NFS and FTP(S) for simplicity, although other data sources may be more secure and preferable.
 
 ![](./assets/dev-notes-runai-data-source.png)
+
+### Add `SYS_ADMIN` capability and disable DCGM for NSight Compute
+
+Default each node has NVIDIA GPU Operator running DCGM to collect GPU metrics
+
+- [NSight Compute] Requires `SYS_ADMIN` capability and with no running DCGM.
+- NSight Compute is useful for detailed CUDA kernel profiling, such as for NVIDIA Warp kernels.
+
+For more details, see [this section](./applications.md#nvhpc).
 
 ### Tips on Resolving Node/GPU/Run:ai Failure
 
