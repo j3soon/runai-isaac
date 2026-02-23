@@ -153,7 +153,7 @@ Default has no additional capabilities
 - [NSight Systems] Requires `SYS_ADMIN` capability to work.
 - NSight Systems is useful for overall profiling, such as for NVIDIA Warp kernels.
 
-For more details, see [this section](./applications.md#nvhpc).
+For more details, see [this section](./applications/nvhpc.md).
 
 ### Disable Ownership Change for Tar Extract on NFS
 
@@ -250,7 +250,7 @@ Default each node has NVIDIA GPU Operator running DCGM to collect GPU metrics
 - [NSight Compute] Requires `SYS_ADMIN` capability and with no running DCGM.
 - NSight Compute is useful for detailed CUDA kernel profiling, such as for NVIDIA Warp kernels.
 
-For more details, see [this section](./applications.md#nvhpc).
+For more details, see [this section](./applications/nvhpc.md).
 
 ### Tips on Resolving Node/GPU/Run:ai Failure
 

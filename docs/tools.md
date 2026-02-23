@@ -1,6 +1,6 @@
 # Tools
 
-This is the tools showcase page. For instructions, please refer to [the Applications section](./applications.md).
+This is the tools showcase page. For instructions, please refer to [the Applications section](./applications/README.md).
 
 ![](./assets/tools-runai-home.png)
 ![](./assets/tools-runai-connect.png)
