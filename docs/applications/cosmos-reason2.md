@@ -2,7 +2,7 @@
 
 This page is part of the sample applications guide. Follow [README](../../README.md) first and stop interactive workloads when finished.
 
-Create a docker image for [cosmos-reason2](https://github.com/nvidia-cosmos/cosmos-reason2).
+(Optional) Create a docker image for [cosmos-reason2](https://github.com/nvidia-cosmos/cosmos-reason2).
 
 `docker/cosmos-reason2/Dockerfile` is a self-contained local variant that clones the upstream repo at a pinned commit during the build.
 

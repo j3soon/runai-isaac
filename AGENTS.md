@@ -4,6 +4,7 @@
 This repository is a documentation-and-assets workspace for running NVIDIA Isaac workloads on Run:ai, with supporting Docker images and shell utilities.
 
 - `docker/`: Dockerfiles and image-specific assets (for example `docker/pytorch-mnist/Dockerfile`, `docker/isaac-sim/`, `docker/isaac-lab/`).
+- For products with multiple major model/image variants (for example Cosmos, GR00T), prefer separate versioned folders (for example `docker/<name>-n1/`, `docker/<name>-n1.6/`) and matching versioned docs pages under `docs/applications/`.
 - `scripts/`: Operational shell scripts, grouped by purpose (`scripts/docker/run.sh`, `scripts/admin/`, `scripts/vpn/`).
 - `docs/`: User/developer documentation and screenshots (`docs/assets/`).
 - `thirdparty/omnicli/`: Bundled Omniverse CLI binaries used by `/run.sh`.
@@ -27,6 +28,7 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - Cosmos image naming differs by generation: keep legacy v1 image names (for example `j3soon/runai-cosmos-predict1`) for backward compatibility, but use tag-based names for v2/v2.5 images (for example `j3soon/runai-cosmos-predict:2.5`, `j3soon/runai-cosmos-reason:2`) for future images.
 - Application docs must include a `/run.sh` command note (environment command example), and it must match the Dockerfile's environment/tooling (for example use `uv pip install ...` for `uv`-managed images instead of `pip install ...`).
 - Dockerfiles should end with the standard `thirdparty/omnicli` and `scripts/docker/run.sh` copies plus `chmod` and CRLF guard (`sed -i 's/\r$//' /run.sh`); also set `ENV SHELL=/bin/bash`.
+- If a Dockerfile depends on a pinned upstream commit/tag/sha, keep that pin in the Dockerfile and do not document ad-hoc user overrides in app guides unless the repo explicitly supports/testing that workflow.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
 
 ## Testing Guidelines

@@ -2,7 +2,7 @@
 
 This page is part of the sample applications guide. Follow [README](../../README.md) first and stop interactive workloads when finished.
 
-Create a docker image for [cosmos-transfer2.5](https://github.com/nvidia-cosmos/cosmos-transfer2.5).
+(Optional) Create a docker image for [cosmos-transfer2.5](https://github.com/nvidia-cosmos/cosmos-transfer2.5).
 
 `docker/cosmos-transfer2.5/Dockerfile` is a self-contained local variant that clones the upstream repo at a pinned commit during the build.
 
