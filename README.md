@@ -120,6 +120,8 @@ You will be prompted to change your password. Make sure to take note of the new 
 
 ## Creating Run:ai Environments and Workloads
 
+> Note that the screenshots may differ slightly from dashboards on different Run:ai versions.
+
 We strongly recommend following the instructions at least once to understand the cluster's logic. For example, any data stored outside the persistent NFS volume will be deleted when the container is terminated.
 
 Pre-built Docker images for Isaac Sim, Isaac Lab, and other applications are described at the end of this document. However, we recommend following the instructions below at least once to familiarize yourself with the workflow.
@@ -304,6 +306,11 @@ We take the PyTorch MNIST training code as an example.
    > In our case, we didn't limit the Jupyter access to specific users, so anyone can access the Jupyter Lab.
 
    > The `/run.sh` file mentioned here is the same `run.sh` script that was copied directly into the Docker image without any modifications during the second step. This pre-written helper script streamlines file downloads and uploads to and from Nucleus while also supporting the sequential execution of multiple commands.  
+
+   > In the latest version (v2.23), the workspace creation will require clicking an additional button to select corresponding environment/resources. The `Load from existing setup` button looks like below:
+   >
+   > <img src="./docs/assets/load-button-from-runai-v2.23.png" width="100px">
+
 
    ![](./docs/assets/workloads.png)
    ![](./docs/assets/workload-new-interactive-1.png)
