@@ -24,6 +24,7 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - For Dockerfiles copied from upstream projects, keep them verbatim by default and include the upstream reference link on the first line. If upstream companion files are needed, prefer a concise self-contained `Dockerfile` that clones the upstream repo at a pinned commit/tag during build. Keep the upstream-verbatim Dockerfile only when practical, and document local fixes briefly in the PR/commit summary.
 - Do not use branch names (for example `main`) for upstream refs; always query/find the latest commit SHA over the network and pin that exact commit SHA.
 - If a Cosmos image reference is needed, refer to `docker/cosmos-predict2.5/Dockerfile` and `docs/applications/cosmos-predict2.5.md`.
+- Cosmos image naming differs by generation: keep legacy v1 image names (for example `j3soon/runai-cosmos-predict1`) for backward compatibility, but use tag-based names for v2/v2.5 images (for example `j3soon/runai-cosmos-predict:2.5`, `j3soon/runai-cosmos-reason:2`) for future images.
 - Application docs must include a `/run.sh` command note (environment command example), and it must match the Dockerfile's environment/tooling (for example use `uv pip install ...` for `uv`-managed images instead of `pip install ...`).
 - Dockerfiles should end with the standard `thirdparty/omnicli` and `scripts/docker/run.sh` copies plus `chmod` and CRLF guard (`sed -i 's/\r$//' /run.sh`); also set `ENV SHELL=/bin/bash`.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
