@@ -21,6 +21,11 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - Shell scripts use Bash (`#!/bin/bash`) with 2-space to 4-space indentation; keep style consistent with the touched file.
 - Prefer descriptive, lowercase file names with underscores for scripts (for example `create_user.sh`).
 - Dockerfiles are organized by product/version (`Dockerfile_5_0_0`, `Dockerfile_2_2_0`); follow the existing version suffix format.
+- For Dockerfiles copied from upstream projects, keep them verbatim by default and include the upstream reference link on the first line. If upstream companion files are needed, prefer a concise self-contained `Dockerfile` that clones the upstream repo at a pinned commit/tag during build. Keep the upstream-verbatim Dockerfile only when practical, and document local fixes briefly in the PR/commit summary.
+- Do not use branch names (for example `main`) for upstream refs; always query/find the latest commit SHA over the network and pin that exact commit SHA.
+- If a Cosmos image reference is needed, refer to `docker/cosmos-predict2.5/Dockerfile` and `docs/applications/cosmos-transfer.5.md`.
+- Application docs should include the `/run.sh` environment command example when applicable, and it must match the Dockerfile's environment/tooling (for example use `uv pip install ...` for `uv`-managed images instead of `pip install ...`).
+- Dockerfiles should end with the standard `thirdparty/omnicli` and `scripts/docker/run.sh` copies plus `chmod` and CRLF guard (`sed -i 's/\r$//' /run.sh`); also set `ENV SHELL=/bin/bash` for Jupyter Lab usages.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
 
 ## Testing Guidelines
