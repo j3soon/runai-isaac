@@ -31,6 +31,7 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 | [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex) | [Isaac Lab (Extended) Interactive Workspace](./docs/applications/isaac-lab-extended-interactive-workspace.md) |
 | [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1) | [Cosmos-Predict1](./docs/applications/cosmos-predict1.md) |
 | [j3soon/runai-cosmos-predict2.5](https://hub.docker.com/r/j3soon/runai-cosmos-predict2.5) | [Cosmos-Predict2.5](./docs/applications/cosmos-predict2.5.md) |
+| [j3soon/runai-cosmos-reason2](https://hub.docker.com/r/j3soon/runai-cosmos-reason2) | [Cosmos-Reason2](./docs/applications/cosmos-reason2.md) |
 | [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1) | [Cosmos-Transfer1](./docs/applications/cosmos-transfer1.md) |
 | [j3soon/runai-cosmos-transfer2.5](https://hub.docker.com/r/j3soon/runai-cosmos-transfer2.5) | [Cosmos-Transfer2.5](./docs/applications/cosmos-transfer2.5.md) |
 | [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc) | [NVHPC](./docs/applications/nvhpc.md) |

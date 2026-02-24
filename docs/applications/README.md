@@ -14,6 +14,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 - [Isaac GR00T](./isaac-gr00t.md)
 - [Cosmos-Predict1](./cosmos-predict1.md)
 - [Cosmos-Predict2.5](./cosmos-predict2.5.md)
+- [Cosmos-Reason2](./cosmos-reason2.md)
 - [Cosmos-Transfer1](./cosmos-transfer1.md)
 - [Cosmos-Transfer2.5](./cosmos-transfer2.5.md)
 - [NVHPC](./nvhpc.md)

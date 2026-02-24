@@ -1,0 +1,98 @@
+# Ref: https://github.com/nvidia-cosmos/cosmos-reason2/blob/main/Dockerfile
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Dockerfile using uv environment.
+
+ARG TARGETPLATFORM
+ARG CUDA_VERSION=12.8.1
+ARG BASE_IMAGE=nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04
+
+FROM ${BASE_IMAGE}
+ARG CUDA_VERSION
+
+# Set the DEBIAN_FRONTEND environment variable to avoid interactive prompts during apt operations.
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install packages
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        ffmpeg \
+        git \
+        git-lfs \
+        gpg \
+        lsb-release \
+        tree \
+        wget
+
+# Install redis-server: https://redis.io/docs/latest/operate/oss_and_stack/install/archive/install-redis/install-redis-on-linux/#install-on-ubuntudebian
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg && \
+    chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends redis
+
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+# https://github.com/astral-sh/uv-docker-example/blob/main/Dockerfile
+COPY --from=ghcr.io/astral-sh/uv:0.8.12 /uv /uvx /usr/local/bin/
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
+# Ensure installed tools can be executed out of the box
+ENV UV_TOOL_BIN_DIR=/usr/local/bin
+
+# Install just: https://just.systems/man/en/pre-built-binaries.html
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin --tag 1.44.0
+
+# Install wandb
+RUN uv tool install wandb
+
+WORKDIR /workspace
+
+ARG COSMOS_REASON2_REPO=https://github.com/nvidia-cosmos/cosmos-reason2.git
+ARG COSMOS_REASON2_REF=c8d639cb60292de0b456708ed58b26cc164e573b
+RUN git clone ${COSMOS_REASON2_REPO} /workspace && \
+    cd /workspace && \
+    git checkout ${COSMOS_REASON2_REF}
+
+# Install the project's dependencies using the lockfile and settings.
+RUN echo cu${CUDA_VERSION} | cut -d. -f1,2 | tr -d . > /root/.cuda-name
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project --no-editable --extra=$(cat /root/.cuda-name)
+
+# Place executables in the environment at the front of the path
+ENV PATH="/workspace/.venv/bin:$PATH"
+
+# Triton bundled ptxas doesn't support latest GPU architectures
+ENV TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas"
+ENV SHELL=/bin/bash
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
+
+ENTRYPOINT ["/workspace/docker/entrypoint.sh"]
+
+CMD ["/bin/bash"]
