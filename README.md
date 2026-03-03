@@ -36,6 +36,7 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 | [j3soon/runai-cosmos-transfer:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-transfer) | [Cosmos-Transfer2.5](./docs/applications/cosmos-transfer2.5.md) |
 | [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc) | [NVHPC](./docs/applications/nvhpc.md) |
 | [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1](./docs/applications/isaac-gr00t-n1.md) |
+| [j3soon/runai-isaac-gr00t:n1.5](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.5](./docs/applications/isaac-gr00t-n1.5.md) |
 | [j3soon/runai-isaac-gr00t:n1.6](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.6](./docs/applications/isaac-gr00t-n1.6.md) |
 
 See [the Applications index](./docs/applications/README.md) for more example applications.

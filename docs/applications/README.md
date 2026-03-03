@@ -12,6 +12,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 - [Isaac Lab Headless Workspace](./isaac-lab-headless-workspace.md)
 - [Isaac Lab (Extended) Interactive Workspace](./isaac-lab-extended-interactive-workspace.md)
 - [Isaac GR00T N1](./isaac-gr00t-n1.md)
+- [Isaac GR00T N1.5](./isaac-gr00t-n1.5.md)
 - [Isaac GR00T N1.6](./isaac-gr00t-n1.6.md)
 - [Cosmos-Predict1](./cosmos-predict1.md)
 - [Cosmos-Predict2.5](./cosmos-predict2.5.md)
