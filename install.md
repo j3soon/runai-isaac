@@ -97,6 +97,14 @@ In our case, we have a single cluster where all users are trusted and cooperativ
        Node pool: prod
        GPU devices: 100
        Over quota: Disabled
+   Scheduling rules:
+     Idle GPU timeout:
+     - Workload type: Training
+       Days: 1
+     - Workload type: Preemptible workspaces
+       Days: 1
+     - Workload type: Non-preemptible workspaces
+       Days: 1
    -----
    Department: runai/runai-cluster/lab2
    Project name: lab2-default-project
@@ -109,6 +117,8 @@ In our case, we have a single cluster where all users are trusted and cooperativ
    ```
 
    Although we currently have only one project per department, we can use the project level to guarantee GPU resources in the future for projects with near-term deadlines. This will require decreasing the GPU resources for departments and the default projects.
+
+   The [Scheduling Rules](https://run-ai-docs.nvidia.com/saas/platform-management/policies/scheduling-rules) can be optionally set. For example, workloads in lab 1 will now be automatically stopped if a workload is idle for more than 1 day. You can set a tighter limit if preferred.
 
 > Note: If you forget to set the `Order of priority` to 1, the workloads sometimes seem to queue indefinitely even if there are GPUs available.
 
