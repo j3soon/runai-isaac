@@ -201,6 +201,7 @@ Since users are trusted to create custom Environments and Templates by themselve
 
    ```sh
    # TODO: Modify these according to your needs.
+   # TODO: Check that the RAID disk has been created. (instructions not included here since it is out of scope)
    NFS_DIR=/mnt/data
 
    df -BT
@@ -208,9 +209,18 @@ Since users are trusted to create custom Environments and Templates by themselve
 
    and then create users:
 
+   > If you prefer less guessable lab names for the shared NFS directories, you can generate names like this:
+   >
+   > ```sh
+   > echo "lab-$(pwgen -1 16)"
+   > echo "lab-$(pwgen -1 16)"
+   > ```
+   >
+   > This is only to reduce accidents such as users browsing into the wrong lab directory by guesswork. It is not a security boundary and should not be treated as secure isolation.
+
    ```sh
    # TODO: Modify these according to your needs.
-   # Also make sure to copy the printed passwords of each FTPS user.
+   # TODO: Also make sure to copy the printed passwords of each FTPS user after running the script.
    NFS_DIR=/mnt/data
    FTPS_USERS=( lab1 lab2 )
 
