@@ -466,6 +466,111 @@ Now that you have a basic understanding of the workflow, here are a few tips to 
 
 For more sample applications (such as Isaac Sim and Isaac Lab), please refer to [the Applications section](./docs/applications/README.md).
 
+## Run:ai CLI
+
+> Skip this section during your first read.
+
+### Install `runai` CLI tool
+
+Follow the [official installation guide](https://run-ai-docs.nvidia.com/self-hosted/reference/cli/install-cli) to install the `runai` CLI tool on your local machine.
+
+If you encountered the following error:
+
+```
+curl: (60) SSL certificate problem: self-signed certificate in certificate chain
+```
+
+1. Extract the token from the commands copied from the Run:ai Dashboard (`(?) -> Researcher Command Line Interface -> Linux`), and you should see something like below:
+
+   ```
+   bash -c "$(curl -fsSL https://RUNAI_SERVER/api/v1/cli-exposer/installer/linux -H 'Authorization: Bearer RUNAI_TOKEN')"
+   ```
+
+2. Take note of the `RUNAI_SERVER` and `RUNAI_TOKEN` values but don't run the command above. Manually install the binary with the following commands:
+
+   ```sh
+   RUNAI_SERVER="<YOUR_RUNAI_SERVER>"
+   RUNAI_TOKEN="<YOUR_AUTH_KEY>"
+   # Download manually
+   curl -k -fsSL "https://${RUNAI_SERVER}/api/v1/cli-exposer/installer/linux" -H "Authorization: Bearer ${RUNAI_TOKEN}" -o install_runai_cli.sh
+   # Patch the installer script
+   sed -i 's/curl -o/curl -k -o/g' install_runai_cli.sh
+   chmod +x install_runai_cli.sh
+   # Run the installer script
+   ./install_runai_cli.sh
+   # and select Yes for all prompts
+   source ~/.bashrc
+   # or for ZSH
+   # source ~/.zshrc
+   ```
+
+3. Trust the self-signed certificate locally (avoid system-wide changes):
+
+   ```sh
+   mkdir -p ~/.runai/certs
+   openssl s_client -showcerts -connect "${RUNAI_SERVER}:443" -servername "${RUNAI_SERVER}" </dev/null 2>/dev/null \
+   | awk '/BEGIN CERTIFICATE/{n++} n==2{print} /END CERTIFICATE/{if(n==2) exit}' \
+   > ~/.runai/certs/root-ca.crt
+   ```
+
+4. Login with your username (email) and password:
+
+   ```sh
+   export SSL_CERT_FILE="$HOME/.runai/certs/root-ca.crt"
+   runai login user -u <username>
+   runai whoami
+   ```
+
+   The export is necessary for each new terminal session. Otherwise, you will encounter the following error when running `runai` commands:
+
+   ```
+   Error: Authenticate failed. Get "...": tls: failed to verify certificate: x509: certificate signed by unknown authority
+   ```
+
+5. Set default project:
+
+   ```sh
+   runai project list
+   runai project set <YOUR_PROJECT>
+   runai workspace list
+   ```
+
+### Basic `runai` CLI commands
+
+Submit a simple workspace (`nvidia-smi`, `ls`, then sleep for 5 minutes) with 1 GPU, large shared memory, and NFS volume mounted:
+
+```sh
+RUNAI_USER=<YOUR_USERNAME>
+STORAGE_NODE_IP=<YOUR_STORAGE_NODE_IP>
+STORAGE_NFS_PATH=<YOUR_STORAGE_NFS_PATH>
+runai workspace submit ${RUNAI_USER}-pytorch-mnist \
+  --image j3soon/runai-pytorch-mnist \
+  --node-pools prod \
+  --preemptible \
+  --large-shm \
+  --gpu-devices-request 1 \
+  --nfs "server=${STORAGE_NODE_IP},path=${STORAGE_NFS_PATH},mountpath=/mnt/nfs,readwrite" \
+  --command -- /run.sh "nvidia-smi" "ls /mnt/nfs" "sleep 300"
+
+# to view more options, run:
+runai workspace submit --help
+
+# and to view the logs:
+runai workspace list
+runai workspace describe j3soon-pytorch-mnist
+runai workspace logs j3soon-pytorch-mnist --follow
+
+# and to connect via bash:
+runai workspace bash j3soon-pytorch-mnist
+
+# workspace management:
+runai workspace suspend j3soon-pytorch-mnist
+runai workspace resume j3soon-pytorch-mnist
+runai workspace delete j3soon-pytorch-mnist
+```
+
+For the full CLI reference, see the official Run:ai [CLI Commands Examples](https://run-ai-docs.nvidia.com/saas/reference/cli/cli-examples) and [CLI Commands Reference](https://run-ai-docs.nvidia.com/saas/reference/cli/runai).
+
 ## Developer Notes & FAQ
 
 See [the Developer Notes](./docs/developer-notes.md) for more details.
