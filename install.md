@@ -67,19 +67,19 @@ In our case, we have a single cluster where all users are trusted and cooperativ
    ```
    Department name: lab1
    Quota management:
-     Allow department to go over quota: False
      Node Pools
        Order of priority: 1
        Node pool: prod
        GPU devices: 100
+       Over quota: Disabled
    -----
    Department name: lab2
    Quota management:
-     Allow department to go over quota: False
      Node Pools
        Order of priority: 1
        Node pool: prod
        GPU devices: 100
+       Over quota: Disabled
    ```
 
    > The GUI has maximum 100 GPUs as default, if your cluster have more than 100 GPUs, the maximum will be automatically increased to the number of GPUs in the cluster.
