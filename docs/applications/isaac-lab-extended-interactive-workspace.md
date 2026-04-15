@@ -4,13 +4,17 @@ This page is part of the sample applications guide. Follow [README](../../README
 
 We take Isaac Lab interactive mode as an example for GUI-based reinforcement learning development and visualization.
 
-1. (Optional) Create a docker image for [Isaac Lab Extended Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-lab-ex/Dockerfile_2_1_0):
+1. (Optional) Create a docker image for Isaac Lab Extended Workspace:
    ```sh
    docker build -t j3soon/runai-isaac-lab-ex:2.1.0 -f docker/isaac-lab-ex/Dockerfile_2_1_0 .
    docker push j3soon/runai-isaac-lab-ex:2.1.0
    docker build -t j3soon/runai-isaac-lab-ex:2.2.0 -f docker/isaac-lab-ex/Dockerfile_2_2_0 .
    docker push j3soon/runai-isaac-lab-ex:2.2.0
+   docker build -t j3soon/runai-isaac-lab-ex:2.3.2 -f docker/isaac-lab-ex/Dockerfile_2_3_2 .
+   docker push j3soon/runai-isaac-lab-ex:2.3.2
    ```
+
+   Available Dockerfiles: [`docker/isaac-lab-ex/Dockerfile_2_1_0`](../../docker/isaac-lab-ex/Dockerfile_2_1_0), [`docker/isaac-lab-ex/Dockerfile_2_2_0`](../../docker/isaac-lab-ex/Dockerfile_2_2_0), [`docker/isaac-lab-ex/Dockerfile_2_3_2`](../../docker/isaac-lab-ex/Dockerfile_2_3_2).
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
@@ -38,7 +42,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
    - Image
      - Image URL
        ```
-       j3soon/runai-isaac-lab-ex:2.1.0
+       j3soon/runai-isaac-lab-ex:2.3.2
        ```
      - Image pull policy
        ```

@@ -4,13 +4,17 @@ This page is part of the sample applications guide. Follow [README](../../README
 
 We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headless training as an example for reinforcement learning workloads that don't require GUI interaction.
 
-1. (Optional) Create a docker image for [Isaac Sim Workspace](https://github.com/j3soon/runai-isaac/blob/main/docker/isaac-sim/Dockerfile_4_5_0) following the [docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
+1. (Optional) Create a docker image for Isaac Lab Workspace following the [docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
    ```sh
    docker build -t j3soon/runai-isaac-lab:2.1.0 -f docker/isaac-lab/Dockerfile_2_1_0 .
    docker push j3soon/runai-isaac-lab:2.1.0
    docker build -t j3soon/runai-isaac-lab:2.2.0 -f docker/isaac-lab/Dockerfile_2_2_0 .
    docker push j3soon/runai-isaac-lab:2.2.0
+   docker build -t j3soon/runai-isaac-lab:2.3.2 -f docker/isaac-lab/Dockerfile_2_3_2 .
+   docker push j3soon/runai-isaac-lab:2.3.2
    ```
+
+   Available Dockerfiles: [`docker/isaac-lab/Dockerfile_2_1_0`](../../docker/isaac-lab/Dockerfile_2_1_0), [`docker/isaac-lab/Dockerfile_2_2_0`](../../docker/isaac-lab/Dockerfile_2_2_0), [`docker/isaac-lab/Dockerfile_2_3_2`](../../docker/isaac-lab/Dockerfile_2_3_2).
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
@@ -38,7 +42,7 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    - Image
      - Image URL
        ```
-       j3soon/runai-isaac-lab:2.1.0
+       j3soon/runai-isaac-lab:2.3.2
        ```
      - Image pull policy
        ```
