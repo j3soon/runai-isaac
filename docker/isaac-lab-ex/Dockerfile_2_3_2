@@ -68,6 +68,7 @@ EOF
 
 # Install XFCE
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    dbus-x11 \
     xfce4 \
     && rm -rf /var/lib/apt/lists/*
 # Fix "Failed to execute default terminal emulator. Input/output error."
@@ -105,7 +106,7 @@ RUN ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 # Configure supervisor to manage the noVNC server
 RUN cat <<EOF > /etc/supervisor/conf.d/novnc.conf
 [program:novnc]
-command=/usr/share/novnc/utils/launch.sh --vnc localhost:5900
+command=/usr/share/novnc/utils/novnc_proxy --vnc localhost:5900
 stderr_logfile=/var/log/novnc.err.log
 stdout_logfile=/var/log/novnc.out.log
 EOF
@@ -134,6 +135,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install jupyterlab --break-system-packages
+# Set default Jupyter Lab shell to bash
+ENV SHELL=/bin/bash
 
 # =====Move all password settings to the end=====
 
@@ -154,12 +157,19 @@ ARG TIGERVNC_PASSWORD
 RUN mkdir -p ~/.vnc && \
     echo "${TIGERVNC_PASSWORD}" | vncpasswd -f > ~/.vnc/passwd && \
     chmod 600 ~/.vnc/passwd
+RUN cat <<'EOF' > ~/.vnc/xstartup
+#!/bin/sh
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec dbus-launch --exit-with-session /usr/bin/startxfce4
+EOF
+RUN chmod +x ~/.vnc/xstartup
 
 # Configure supervisor to manage the TigerVNC server
 RUN if [ -z "${TIGERVNC_PASSWORD}" ]; then FLAG="-SecurityTypes None --I-KNOW-THIS-IS-INSECURE"; else FLAG=""; fi && \
 cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
 [program:tigervnc]
-command=/usr/bin/vncserver :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
+command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no -extension GLX ${FLAG}
 stderr_logfile=/var/log/tigervnc.err.log
 stdout_logfile=/var/log/tigervnc.out.log
 EOF
