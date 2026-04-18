@@ -330,11 +330,19 @@ Since users are trusted to create custom Environments and Templates by themselve
      sudo mkdir -p $NFS_DIR/$user
      sudo chmod a-w /home/vftp/$user
      sudo mkdir -p /home/vftp/$user/mnt/nfs
-     sudo mount --bind $NFS_DIR/$user /home/vftp/$user/mnt/nfs
+     # Fix ownership
      sudo chown ftp:ftp /home/vftp/$user/mnt
      sudo chown ftp:ftp /home/vftp/$user/mnt/nfs
+     # Add to /etc/fstab mount if not already present
+     SRC_DIR="$NFS_DIR/$user"
+     TARGET_DIR="/home/vftp/$user/mnt/nfs"
+     FSTAB_ENTRY="$SRC_DIR $TARGET_DIR none bind 0 0"
+     if ! grep -qs "^$SRC_DIR $TARGET_DIR " /etc/fstab; then
+       echo "$FSTAB_ENTRY" | sudo tee -a /etc/fstab > /dev/null
+     fi
    done
 
+   sudo mount -a
    sudo service vsftpd restart
    ```
 
