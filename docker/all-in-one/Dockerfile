@@ -210,6 +210,7 @@ RUN if [ -z "${TIGERVNC_PASSWORD}" ]; then FLAG="-SecurityTypes None --I-KNOW-TH
 cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
 [program:tigervnc]
 command=/usr/bin/vncserver :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
+autorestart=false
 stderr_logfile=/var/log/tigervnc.err.log
 stdout_logfile=/var/log/tigervnc.out.log
 EOF
