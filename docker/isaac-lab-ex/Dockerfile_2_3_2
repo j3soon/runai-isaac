@@ -159,9 +159,7 @@ RUN mkdir -p ~/.vnc && \
     chmod 600 ~/.vnc/passwd
 RUN cat <<'EOF' > ~/.vnc/xstartup
 #!/bin/sh
-unset SESSION_MANAGER
-unset DBUS_SESSION_BUS_ADDRESS
-exec dbus-launch --exit-with-session /usr/bin/startxfce4
+exec dbus-launch --exit-with-session startxfce4
 EOF
 RUN chmod +x ~/.vnc/xstartup
 
