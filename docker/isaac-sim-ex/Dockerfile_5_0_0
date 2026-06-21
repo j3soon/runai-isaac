@@ -192,6 +192,7 @@ EOF
 
 # =====Isaac Sim=====
 
+ENV OMNI_KIT_ALLOW_ROOT=1
 ENV ACCEPT_EULA=Y
 
 # Tools and scripts for Omniverse

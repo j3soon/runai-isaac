@@ -11,6 +11,10 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
    docker push j3soon/runai-isaac-sim-ex:4.5.0
    docker build -t j3soon/runai-isaac-sim-ex:5.0.0 -f docker/isaac-sim-ex/Dockerfile_5_0_0 .
    docker push j3soon/runai-isaac-sim-ex:5.0.0
+   docker build -t j3soon/runai-isaac-sim-ex:5.1.0 -f docker/isaac-sim-ex/Dockerfile_5_1_0 .
+   docker push j3soon/runai-isaac-sim-ex:5.1.0
+   docker build -t j3soon/runai-isaac-sim-ex:6.0.0 -f docker/isaac-sim-ex/Dockerfile_6_0_0 .
+   docker push j3soon/runai-isaac-sim-ex:6.0.0
    ```
 
    > This step is optional since we provide pre-built docker images on Docker Hub.

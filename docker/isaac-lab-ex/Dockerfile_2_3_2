@@ -169,7 +169,7 @@ RUN chmod +x ~/.vnc/xstartup
 RUN if [ -z "${TIGERVNC_PASSWORD}" ]; then FLAG="-SecurityTypes None --I-KNOW-THIS-IS-INSECURE"; else FLAG=""; fi && \
 cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
 [program:tigervnc]
-command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no -extension GLX ${FLAG}
+command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
 autorestart=false
 stderr_logfile=/var/log/tigervnc.err.log
 stdout_logfile=/var/log/tigervnc.out.log
