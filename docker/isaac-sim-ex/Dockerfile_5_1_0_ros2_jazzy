@@ -235,7 +235,7 @@ EOF
 
 # Install code-server
 # Ref: https://coder.com/docs/code-server/install#debian-ubuntu
-RUN CODE_SERVER_VERSION=4.100.3 \
+RUN CODE_SERVER_VERSION=4.125.0 \
     && curl -fOL https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_amd64.deb \
     && dpkg -i code-server_${CODE_SERVER_VERSION}_amd64.deb \
     && rm code-server_${CODE_SERVER_VERSION}_amd64.deb
@@ -290,7 +290,7 @@ RUN chmod +x ~/.vnc/xstartup
 RUN if [ -z "${TIGERVNC_PASSWORD}" ]; then FLAG="-SecurityTypes None --I-KNOW-THIS-IS-INSECURE"; else FLAG=""; fi && \
 cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
 [program:tigervnc]
-command=/usr/bin/vncserver :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
+command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no -extension GLX ${FLAG}
 autorestart=false
 stderr_logfile=/var/log/tigervnc.err.log
 stdout_logfile=/var/log/tigervnc.out.log
