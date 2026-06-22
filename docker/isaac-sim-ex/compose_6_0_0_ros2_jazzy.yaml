@@ -1,0 +1,20 @@
+services:
+  isaac-sim-ex:
+    image: j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy
+    pull_policy: always
+    # Don't use `network_mode: host` here, as cloud environments may cause issues and cause `ros2 topic list` to hang.
+    ports:
+      - "2222:22"
+      - "5900:5900"
+      - "6080:6080"
+      - "8080:8080"
+      - "8888:8888"
+    volumes:
+      - /workspace:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
