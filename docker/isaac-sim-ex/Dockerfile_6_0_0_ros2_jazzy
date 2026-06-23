@@ -136,6 +136,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Download, extract, and run post-install for Isaac Sim 6.0.0
+# Note that Isaac Sim 6.0 download url format is different from Isaac Sim 5.x.
 RUN wget -q https://downloads.isaacsim.nvidia.com/isaac-sim-standalone-6.0.0-linux-x86_64.zip \
         -O /tmp/isaac-sim.zip \
     && mkdir -p ${ISAACSIM_PATH} \
@@ -292,7 +293,6 @@ cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
 [program:tigervnc]
 command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
 environment=__EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
-autorestart=false
 stderr_logfile=/var/log/tigervnc.err.log
 stdout_logfile=/var/log/tigervnc.out.log
 EOF
