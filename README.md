@@ -23,24 +23,24 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 
 | Docker tags | Docs |
 | --- | --- |
-| [j3soon/runai-all-in-one](https://hub.docker.com/r/j3soon/runai-all-in-one) | [All-In-One Interactive Workspace](./docs/applications/all-in-one-interactive-workspace.md) |
+| [j3soon/runai-all-in-one](https://hub.docker.com/r/j3soon/runai-all-in-one) | [All-In-One Interactive Workspace](./docker/all-in-one/README.md) |
 | [j3soon/runai-pytorch-mnist](https://hub.docker.com/r/j3soon/runai-pytorch-mnist) | [Jupyter Lab with Custom Base Image](#jupyter-lab-with-custom-base-image) |
-| [j3soon/runai-isaac-sim:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)<br>[j3soon/runai-isaac-sim:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)<br>[j3soon/runai-isaac-sim:5.1.0](https://hub.docker.com/r/j3soon/runai-isaac-sim) | [Isaac Sim Headless Workspace](./docs/applications/isaac-sim-headless-workspace.md) |
-| [j3soon/runai-isaac-sim-ex:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)<br>[j3soon/runai-isaac-sim-ex:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)<br>[j3soon/runai-isaac-sim-ex:5.1.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex) | [Isaac Sim (Extended) Interactive Workspace](./docs/applications/isaac-sim-extended-interactive-workspace.md) |
-| [j3soon/runai-isaac-lab:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)<br>[j3soon/runai-isaac-lab:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)<br>[j3soon/runai-isaac-lab:2.3.2](https://hub.docker.com/r/j3soon/runai-isaac-lab) | [Isaac Lab Headless Workspace](./docs/applications/isaac-lab-headless-workspace.md) |
-| [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.3.2](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex) | [Isaac Lab (Extended) Interactive Workspace](./docs/applications/isaac-lab-extended-interactive-workspace.md) |
-| [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1) | [Cosmos-Predict1](./docs/applications/cosmos-predict1.md) |
-| [j3soon/runai-cosmos-predict:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-predict) | [Cosmos-Predict2.5](./docs/applications/cosmos-predict2.5.md) |
-| [j3soon/runai-cosmos-reason:2](https://hub.docker.com/r/j3soon/runai-cosmos-reason) | [Cosmos-Reason2](./docs/applications/cosmos-reason2.md) |
-| [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1) | [Cosmos-Transfer1](./docs/applications/cosmos-transfer1.md) |
-| [j3soon/runai-cosmos-transfer:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-transfer) | [Cosmos-Transfer2.5](./docs/applications/cosmos-transfer2.5.md) |
-| [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc) | [NVHPC](./docs/applications/nvhpc.md) |
-| [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1](./docs/applications/isaac-gr00t-n1.md) |
-| [j3soon/runai-isaac-gr00t:n1.5](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.5](./docs/applications/isaac-gr00t-n1.5.md) |
-| [j3soon/runai-isaac-gr00t:n1.6](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.6](./docs/applications/isaac-gr00t-n1.6.md) |
-| [j3soon/runai-lerobot-gpu:0.4.4](https://hub.docker.com/r/j3soon/runai-lerobot-gpu) | [LeRobot GPU](./docs/applications/lerobot-gpu.md) |
+| [j3soon/runai-isaac-sim:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)<br>[j3soon/runai-isaac-sim:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim)<br>[j3soon/runai-isaac-sim:5.1.0](https://hub.docker.com/r/j3soon/runai-isaac-sim) | [Isaac Sim Headless Workspace](./docker/isaac-sim/README.md) |
+| [j3soon/runai-isaac-sim-ex:4.5.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)<br>[j3soon/runai-isaac-sim-ex:5.0.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex)<br>[j3soon/runai-isaac-sim-ex:5.1.0](https://hub.docker.com/r/j3soon/runai-isaac-sim-ex) | [Isaac Sim (Extended) Interactive Workspace](./docker/isaac-sim-ex/README.md) |
+| [j3soon/runai-isaac-lab:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)<br>[j3soon/runai-isaac-lab:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab)<br>[j3soon/runai-isaac-lab:2.3.2](https://hub.docker.com/r/j3soon/runai-isaac-lab) | [Isaac Lab Headless Workspace](./docker/isaac-lab/README.md) |
+| [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.3.2](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex) | [Isaac Lab (Extended) Interactive Workspace](./docker/isaac-lab-ex/README.md) |
+| [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1) | [Cosmos-Predict1](./docker/cosmos-predict1/README.md) |
+| [j3soon/runai-cosmos-predict:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-predict) | [Cosmos-Predict2.5](./docker/cosmos-predict2.5/README.md) |
+| [j3soon/runai-cosmos-reason:2](https://hub.docker.com/r/j3soon/runai-cosmos-reason) | [Cosmos-Reason2](./docker/cosmos-reason2/README.md) |
+| [j3soon/runai-cosmos-transfer1](https://hub.docker.com/r/j3soon/runai-cosmos-transfer1) | [Cosmos-Transfer1](./docker/cosmos-transfer1/README.md) |
+| [j3soon/runai-cosmos-transfer:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-transfer) | [Cosmos-Transfer2.5](./docker/cosmos-transfer2.5/README.md) |
+| [j3soon/runai-nvhpc:25.5-devel-cuda_multi-ubuntu22.04](https://hub.docker.com/r/j3soon/runai-nvhpc) | [NVHPC](./docker/nvhpc/README.md) |
+| [j3soon/runai-isaac-gr00t:n1](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1](./docker/isaac-gr00t-n1/README.md) |
+| [j3soon/runai-isaac-gr00t:n1.5](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.5](./docker/isaac-gr00t-n1.5/README.md) |
+| [j3soon/runai-isaac-gr00t:n1.6](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.6](./docker/isaac-gr00t-n1.6/README.md) |
+| [j3soon/runai-lerobot-gpu:0.4.4](https://hub.docker.com/r/j3soon/runai-lerobot-gpu) | [LeRobot GPU](./docker/lerobot-gpu/README.md) |
 
-See [the Applications index](./docs/applications/README.md) for more example applications.
+See [the Applications index](./docs/applications.md) for more example applications.
 
 ## Supported Tools
 
@@ -464,7 +464,7 @@ Now that you have a basic understanding of the workflow, here are a few tips to 
 
 5. **Request for minimal GPU resources.** If you are not sure about the minimum GPU resources required for your task, request for minimal resources (`gpu-x1`) first. You can always request for more resources (e.g., `gpu-x2`, `gpu-x4`, `gpu-x8`) later. In addition, don't submit CPU workloads (`gpu-x0`, `cpu-only`) on a GPU node pool unless you have contacted the cluster admin and received explicit permission.
 
-For more sample applications (such as Isaac Sim and Isaac Lab), please refer to [the Applications section](./docs/applications/README.md).
+For more sample applications (such as Isaac Sim and Isaac Lab), please refer to [the Applications section](./docs/applications.md).
 
 ## Developer Notes & FAQ
 

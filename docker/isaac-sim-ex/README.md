@@ -76,7 +76,7 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
        Container port: 6080
        ```
      - Tool
-       (Optionally [expose more ports](./all-in-one-interactive-workspace.md) for other tools if needed.)
+       (Optionally [expose more ports](../all-in-one/README.md) for other tools if needed.)
    - Runtime settings
      - Command
        ```
@@ -147,7 +147,7 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
 
    Then go to `Window > Examples > Robotics Examples`, in the `Robotics Examples` window, click `POLICY > Humanoid > LOAD`.
 
-   ![](../assets/preview/isaac-sim-vnc.png)
+   ![](../../docs/assets/preview/isaac-sim-vnc.png)
 
 6. Delete the workload.
 

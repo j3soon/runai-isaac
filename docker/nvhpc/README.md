@@ -24,7 +24,7 @@ This page is part of the sample applications guide. Follow [README](../../README
    - SYS_ADMIN
    ```
 
-   ![](../assets/nsys-security-sys-admin.png)
+   ![](../../docs/assets/nsys-security-sys-admin.png)
 
    Reference: [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#container-and-scheduler-support)
 

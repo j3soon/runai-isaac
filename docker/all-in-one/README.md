@@ -97,7 +97,7 @@ We take the All-In-One workspace as a comprehensive example that includes multip
 
    and then click `CREATE ENVIRONMENT`.
 
-   ![](../assets/all-in-one-workspace.png)
+   ![](../../docs/assets/all-in-one-workspace.png)
 
 3. Create a new GPU workload based on the environment.
 
@@ -143,7 +143,7 @@ We take the All-In-One workspace as a comprehensive example that includes multip
 
    In `Workload manager > Workloads`, select the workload you just created and click `CONNECT` to access various tools.
 
-   > When using multiple tools within a single environment, the tool ports may be randomly reordered due to a Run:ai bug (which I believe is fixed in the latest version). See the [developer notes](../developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
+   > When using multiple tools within a single environment, the tool ports may be randomly reordered due to a Run:ai bug (which I believe is fixed in the latest version). See the [developer notes](../../docs/developer-notes.md#be-aware-that-runai-tool-urls-may-reorder-randomly) for more details.
    >
    > In this case, you can still identify the correct tool port by trial-and-error. For admins, use `kubectl get services -n runai-<PROJECT_NAME>` to bypass trial-and-error.
 
@@ -153,7 +153,7 @@ We take the All-In-One workspace as a comprehensive example that includes multip
 
    Jupyter Lab, web-based VSCode, and TensorBoard are straightforward to use. For applications that require GUI (such as Isaac Sim and Isaac Lab interactive mode), you can use the noVNC tool. It should show the GUI, and you'll want to set the `Scaling Mode` to `Remote Resizing`. noVNC is the recommended tool for GUI applications, however you can also use VNC viewers to connect directly to the VNC port. Last but not least, the SSH port can connect to the container, and can also be used for local VSCode `Remote Development` feature.
 
-   ![](../assets/all-in-one-workspace-novnc-remote-resizing.png)
+   ![](../../docs/assets/all-in-one-workspace-novnc-remote-resizing.png)
 
 6. Delete the workload.
 

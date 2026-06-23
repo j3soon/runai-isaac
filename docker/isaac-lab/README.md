@@ -14,7 +14,7 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    docker push j3soon/runai-isaac-lab:2.3.2
    ```
 
-   Available Dockerfiles: [`docker/isaac-lab/Dockerfile_2_1_0`](../../docker/isaac-lab/Dockerfile_2_1_0), [`docker/isaac-lab/Dockerfile_2_2_0`](../../docker/isaac-lab/Dockerfile_2_2_0), [`docker/isaac-lab/Dockerfile_2_3_2`](../../docker/isaac-lab/Dockerfile_2_3_2).
+   Available Dockerfiles: [`docker/isaac-lab/Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`docker/isaac-lab/Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`docker/isaac-lab/Dockerfile_2_3_2`](./Dockerfile_2_3_2).
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 

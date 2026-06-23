@@ -14,7 +14,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
    docker push j3soon/runai-isaac-lab-ex:2.3.2
    ```
 
-   Available Dockerfiles: [`docker/isaac-lab-ex/Dockerfile_2_1_0`](../../docker/isaac-lab-ex/Dockerfile_2_1_0), [`docker/isaac-lab-ex/Dockerfile_2_2_0`](../../docker/isaac-lab-ex/Dockerfile_2_2_0), [`docker/isaac-lab-ex/Dockerfile_2_3_2`](../../docker/isaac-lab-ex/Dockerfile_2_3_2).
+   Available Dockerfiles: [`docker/isaac-lab-ex/Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`docker/isaac-lab-ex/Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`docker/isaac-lab-ex/Dockerfile_2_3_2`](./Dockerfile_2_3_2).
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
@@ -62,7 +62,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
        Container port: 6080
        ```
      - Tool
-       (Optionally [expose more ports](./all-in-one-interactive-workspace.md) for other tools if needed.)
+       (Optionally [expose more ports](../all-in-one/README.md) for other tools if needed.)
    - Runtime settings
      - Command
        ```
@@ -133,7 +133,7 @@ We take Isaac Lab interactive mode as an example for GUI-based reinforcement lea
 
    You can change the `--num_envs` to a larger number such as `4096`.
 
-   ![](../assets/preview/isaac-lab-vnc.png)
+   ![](../../docs/assets/preview/isaac-lab-vnc.png)
 
 6. Delete the workload.
 
