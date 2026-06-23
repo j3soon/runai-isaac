@@ -63,26 +63,22 @@ Refer to [Isaac Sim (Extended) Interactive Workspace](../isaac-sim-ex/README.md)
 1. In Isaac Sim GUI, click `Tools > Robotics > ROS 2 OmniGraphs > Clock`, and then click `OK` to add the ROS 2 Clock OmniGraph to the scene. This will allow you to publish simulator clock via ROS 2 from Isaac Sim.
    ![](./assets/09-novnc-isaacsim-clock.png)
    ![](./assets/10-novnc-isaacsim-clock-add.png)
-1. Open another terminal and run `ros2 topic list` and `ros2 topic echo /clock`, and confirm the clock messages are being published from Isaac Sim.
+1. Click the `Play` button to start Isaac Sim simulation. Open another terminal and run `ros2 topic list` and `ros2 topic echo /clock`, and confirm the clock messages are being published from Isaac Sim.
    ![](./assets/11-novnc-isaacsim-ros2-echo.png)
    ![](./assets/12-novnc-isaacsim-ros2-echoed.png)
 1. Store files such as code and data at `/workspace`, since the docker container mounts the host `/workspace` into the container.
 
-<hr>
-
 Additional notes:
 
-At the time of writing, we select Massed Compute as our default provider, as it costs $1.06/hr for x1 L40S GPU (48GB VRAM), x22 CPUs (AMD EPYC 9224 24-Core Processor), 128GB RAM, and 625GB storage (HDD). Changing to other providers should be fine. In the future we plan to test other providers and GPU setups in case this instance type has been used up.
+At the time of writing, we selected Massed Compute as our default provider, as it costs $1.06/hr for x1 L40S GPU (48GB VRAM), x22 CPUs (AMD EPYC 9224 24-Core Processor), 128GB RAM, and 625GB storage (HDD), which has the minimal cost. Changing to other providers should be fine. In the future we plan to test other providers and GPU setups in case this instance type has been used up.
 
 The Brev CLI shell commands, will access a VM host, where you can use docker commands like `docker ps -a` to see the running containers:
 
 ```sh
+brev login --token <token>
+brev set <org>
 brev shell isaac-sim-5-1-0-with-ros-2-jazzy--extended--xxxxxx
 ```
-
-Currently we've only quickly tested ROS 2 clock and images. We plan to perform a more thorough test in the near future.
-
-Although Isaac Sim is fully GPU-accelerated due to the use of Vulkan (verified by ~120 FPS on empty scene), we suspect ROS 2 RViz may be using llvmpipe (CPU) for rendering, as we only get ~2000 FPS on `glxgears`. We plan to further improve this potentially with VirtualGL and TurboVNC in the future.
 
 ## Local
 
@@ -112,3 +108,15 @@ docker run --rm -it --gpus all -e "ACCEPT_EULA=Y" \
   -v $(pwd):/app \
   j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy  # or :5.1.0-ros2-jazzy
 ```
+
+## Developer Notes
+
+Currently we've only quickly tested ROS 2 clock and images. We plan to perform a more thorough Isaac Sim and ROS 2 communication test in the near future.
+
+Although Isaac Sim is fully GPU-accelerated due to the use of Vulkan (verified by ~120 FPS on empty scene), we suspect ROS 2 RViz may be using llvmpipe (CPU) for rendering, as we only get ~2000 FPS on `glxgears`. We plan to further improve this potentially with VirtualGL and TurboVNC in the future.
+
+Isaac Sim 6.0 seems to have only ~25 FPS on empty scene during our quick test. Not sure if this is an issue on our side or just a faulty instance. Need further investigation.
+
+We intentionally install Isaac Sim via binary instead of pip, since the accompanied source code and example code can greatly help AI agents to write new code.
+
+Isaac Lab, CUDA, PyTorch, are intentionally left out in the current build, planning to add a suitable version soon.
