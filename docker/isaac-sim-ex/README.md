@@ -19,18 +19,7 @@ We take Isaac Sim interactive mode as an example for GUI-based simulation develo
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
-   Alternatively, use the ROS 2 Jazzy variant for Isaac Sim 5.1.0 or 6.0.0:
-
-   ```sh
-   # Isaac Sim 5.1.0 + ROS 2 Jazzy
-   docker build -t j3soon/runai-isaac-sim-ex:5.1.0-ros2-jazzy -f docker/isaac-sim-ex/Dockerfile_5_1_0_ros2_jazzy .
-   docker push j3soon/runai-isaac-sim-ex:5.1.0-ros2-jazzy
-   # Isaac Sim 6.0.0 + ROS 2 Jazzy
-   docker build -t j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy -f docker/isaac-sim-ex/Dockerfile_6_0_0_ros2_jazzy .
-   docker push j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy
-   ```
-
-   > **Note:** These images are self-contained (Ubuntu 24.04 base, not the official Isaac Sim container) and download Isaac Sim (~10 GB) during the build. Build time is significantly longer than the other variants. They include ROS 2 Jazzy.
+   For the ROS 2 Jazzy variant, see [Isaac Sim (Extended) with ROS 2](../isaac-sim-ex-ros2/README.md).
 
 2. Create a new environment for your docker image.
 
