@@ -243,7 +243,7 @@ RUN ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 # Configure supervisor to manage the noVNC server
 RUN cat <<EOF > /etc/supervisor/conf.d/novnc.conf
 [program:novnc]
-command=/usr/share/novnc/utils/novnc_proxy --vnc localhost:5900
+command=/usr/share/novnc/utils/novnc_proxy --listen 0.0.0.0:6080 --vnc localhost:5900
 stderr_logfile=/var/log/novnc.err.log
 stdout_logfile=/var/log/novnc.out.log
 EOF
@@ -318,7 +318,7 @@ ARG CODE_SERVER_PASSWORD
 RUN if [ -z "${CODE_SERVER_PASSWORD}" ]; then AUTH="none"; else AUTH="password"; fi && \
 mkdir -p ~/.config/code-server/ && \
 cat <<EOF > ~/.config/code-server/config.yaml
-bind-addr: 127.0.0.1:8080
+bind-addr: 0.0.0.0:8080
 auth: ${AUTH}
 password: ${CODE_SERVER_PASSWORD}
 cert: false
