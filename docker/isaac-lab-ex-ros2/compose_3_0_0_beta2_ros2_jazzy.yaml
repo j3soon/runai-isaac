@@ -1,0 +1,28 @@
+services:
+  isaac-sim-ex:
+    image: j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy
+    pull_policy: always
+    # Don't use `network_mode: host` here, as cloud environments may cause issues and cause `ros2 topic list` to hang.
+    ports:
+      - "2222:22"
+      - "5900:5900"
+      - "6080:6080"
+      - "8080:8080"
+      - "8888:8888"
+    volumes:
+      # Isaac Sim cache
+      - ~/docker/isaac-sim/cache/main:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/config:/isaac-sim/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw
+      # Workspace
+      - /workspace:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
