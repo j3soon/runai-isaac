@@ -19,6 +19,9 @@ docker push j3soon/runai-isaac-sim-ex:5.1.0-ros2-jazzy
 # Isaac Sim 6.0.0 + ROS 2 Jazzy
 docker build -t j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy -f docker/isaac-sim-ex-ros2/Dockerfile_6_0_0_ros2_jazzy .
 docker push j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy
+# Isaac Sim 6.0.1 + ROS 2 Jazzy
+docker build -t j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy -f docker/isaac-sim-ex-ros2/Dockerfile_6_0_1_ros2_jazzy .
+docker push j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy
 ```
 
 > **Note:** These images are self-contained (Ubuntu 24.04 base, not the official Isaac Sim container) and download Isaac Sim (~10 GB) during the build. Build time is significantly longer than the other variants. They include ROS 2 Jazzy.
@@ -31,8 +34,9 @@ Refer to [Isaac Sim (Extended) Interactive Workspace](../isaac-sim-ex/README.md)
 
 | Isaac Sim | ROS 2 | Image URL |
 |-----------|-------|-----------|
-| 5.1.0 | Jazzy | j3soon/runai-isaac-sim-ex-ros2-jazzy:5.1.0 |
-| 6.0.0 | Jazzy | j3soon/runai-isaac-sim-ex-ros2-jazzy:6.0.0 |
+| 5.1.0 | Jazzy | j3soon/runai-isaac-sim-ex:5.1.0-ros2-jazzy |
+| 6.0.0 | Jazzy | j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy |
+| 6.0.1 | Jazzy | j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy |
 
 ## Brev
 
@@ -106,7 +110,13 @@ docker run --rm -it --gpus all -e "ACCEPT_EULA=Y" \
   -v ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw \
   -v ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw \
   -v $(pwd):/app \
-  j3soon/runai-isaac-sim-ex:6.0.0-ros2-jazzy  # or :5.1.0-ros2-jazzy
+  j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy  # or :6.0.0-ros2-jazzy / :5.1.0-ros2-jazzy
+```
+
+You can also use the Docker Compose files:
+
+```sh
+docker compose -f docker/isaac-sim-ex-ros2/compose_6_0_1_ros2_jazzy.yaml up
 ```
 
 ## Developer Notes

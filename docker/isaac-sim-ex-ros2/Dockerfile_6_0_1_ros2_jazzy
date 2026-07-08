@@ -1,0 +1,340 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# =====Common=====
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    git-lfs \
+    htop \
+    iputils-ping \
+    jq \
+    nano \
+    net-tools \
+    netcat-openbsd \
+    nmap \
+    p7zip-full \
+    tmux \
+    tree \
+    unzip \
+    vim \
+    wget \
+    zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====ROS 2 Jazzy=====
+
+# Locale and timezone required before ROS apt source setup
+RUN apt-get update && apt-get install -y \
+    tzdata locales lsb-release software-properties-common \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+ENV ROS_DISTRO=jazzy
+
+RUN add-apt-repository universe \
+    && ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') \
+    && curl -L -o /tmp/ros2-apt-source.deb \
+        "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo $VERSION_CODENAME)_all.deb" \
+    && apt-get install -y /tmp/ros2-apt-source.deb \
+    && rm /tmp/ros2-apt-source.deb \
+    && apt-get update && apt-get upgrade -y \
+    && apt-get install -y \
+        ros-jazzy-desktop \
+        ros-dev-tools \
+        ros-jazzy-rmw-cyclonedds-cpp \
+        ros-jazzy-ros-gz \
+    && rosdep init \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====X11=====
+
+RUN apt-get update && apt-get install -y \
+    x11-apps x11-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====OpenGL=====
+
+# Setup the required capabilities for the container runtime
+# Ref: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html#driver-capabilities
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+
+RUN apt-get update && apt-get install -y \
+    libgl1 mesa-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====Vulkan=====
+
+RUN apt-get update && apt-get install -y \
+    libgl1 vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Vulkan config files
+RUN cat > /etc/vulkan/icd.d/nvidia_icd.json <<EOF
+{
+    "file_format_version" : "1.0.0",
+    "ICD": {
+        "library_path": "libGLX_nvidia.so.0",
+        "api_version" : "1.3.194"
+    }
+}
+EOF
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
+    cat > /usr/share/glvnd/egl_vendor.d/10_nvidia.json <<EOF
+{
+    "file_format_version" : "1.0.0",
+    "ICD" : {
+        "library_path" : "libEGL_nvidia.so.0"
+    }
+}
+EOF
+RUN cat > /etc/vulkan/implicit_layer.d/nvidia_layers.json <<EOF
+{
+    "file_format_version" : "1.0.0",
+    "layer": {
+        "name": "VK_LAYER_NV_optimus",
+        "type": "INSTANCE",
+        "library_path": "libGLX_nvidia.so.0",
+        "api_version" : "1.3.194",
+        "implementation_version" : "1",
+        "description" : "NVIDIA Optimus layer",
+        "functions": {
+            "vkGetInstanceProcAddr": "vk_optimusGetInstanceProcAddr",
+            "vkGetDeviceProcAddr": "vk_optimusGetDeviceProcAddr"
+        },
+        "enable_environment": {
+            "__NV_PRIME_RENDER_OFFLOAD": "1"
+        },
+        "disable_environment": {
+            "DISABLE_LAYER_NV_OPTIMUS_1": ""
+        }
+    }
+}
+EOF
+
+# =====Isaac Sim 6.0.1=====
+
+ENV ISAACSIM_PATH=/root/isaacsim
+ENV ISAACSIM_PYTHON_EXE=/root/isaacsim/python.sh
+ENV OMNI_USER=admin
+ENV OMNI_PASS=admin
+ENV OMNI_KIT_ACCEPT_EULA=YES
+ENV OMNI_KIT_ALLOW_ROOT=1
+ENV ACCEPT_EULA=Y
+# Required to suppress 'unknown terminal type' error during post_install.sh
+ENV TERM=xterm-256color
+
+# Isaac Sim system dependencies
+# Ref: https://docs.isaacsim.omniverse.nvidia.com/6.0.1/installation/install_workstation.html
+RUN apt-get update && apt-get install -y \
+    libglu1-mesa \
+    libxrandr2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download, extract, and run post-install for Isaac Sim 6.0.1
+# Note that Isaac Sim 6.0 download url format is different from Isaac Sim 5.x.
+RUN wget -q https://downloads.isaacsim.nvidia.com/isaac-sim-standalone-6.0.1-linux-x86_64.zip \
+        -O /tmp/isaac-sim.zip \
+    && mkdir -p ${ISAACSIM_PATH} \
+    && 7z x /tmp/isaac-sim.zip -o${ISAACSIM_PATH} \
+    && cd ${ISAACSIM_PATH} \
+    && ./post_install.sh \
+    && rm /tmp/isaac-sim.zip
+
+# Pre-create runtime cache directories to avoid permission issues on first launch
+RUN mkdir -p \
+    /isaac-sim/kit/cache \
+    /root/.cache/ov \
+    /root/.cache/pip \
+    /root/.cache/nvidia/GLCache \
+    /root/.nv/ComputeCache \
+    /root/.nvidia-omniverse/logs \
+    /root/.local/lib/python3.11/site-packages/omni/cache \
+    /root/.local/lib/python3.11/site-packages/omni/logs \
+    /root/.local/share/ov/data \
+    /root/.local/lib/python3.11/site-packages/omni/data \
+    /root/Documents
+
+# =====OpenSSH Server=====
+
+# Use supervisor to manage services
+RUN apt-get update && apt-get install -y \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install OpenSSH Server
+RUN apt-get update && apt-get install -y \
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir /var/run/sshd
+RUN sed -i \
+    -e 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' \
+    /etc/ssh/sshd_config
+# Set environment variables
+# Ref: https://stackoverflow.com/a/34631891
+RUN env | grep -Ev "^(HOME=|USER=|MAIL=|LC_ALL=|LS_COLORS=|LANG=|HOSTNAME=|PWD=|TERM=|SHLVL=|LANGUAGE=|_=)" >> /etc/environment
+# Configure supervisor to manage the SSH server
+RUN cat <<EOF > /etc/supervisor/conf.d/sshd.conf
+[program:sshd]
+command=/usr/sbin/sshd -D
+stderr_logfile=/var/log/sshd.err.log
+stdout_logfile=/var/log/sshd.out.log
+EOF
+
+# =====TigerVNC=====
+
+# Install XFCE
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    dbus-x11 \
+    xfce4 \
+    && rm -rf /var/lib/apt/lists/*
+# Fix "Failed to execute default terminal emulator. Input/output error."
+# Ref: https://askubuntu.com/a/1118319
+# Ref: https://discourse.ubuntu.com/t/ctrl-alt-t-opens-xterm/60235/2
+RUN apt-get update && apt-get install -y \
+    xfce4-terminal \
+    && rm -rf /var/lib/apt/lists/*
+RUN update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
+# Fix "Failed to execute default Web Browser. Input/output error." by installing Firefox
+# Ref: https://support.mozilla.org/en-US/kb/install-firefox-linux
+RUN install -d -m 0755 /etc/apt/keyrings
+RUN wget -q https://packages.mozilla.org/apt/repo-signing-key.gpg -O- | tee /etc/apt/keyrings/packages.mozilla.org.asc > /dev/null
+RUN echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" | tee -a /etc/apt/sources.list.d/mozilla.list > /dev/null
+RUN echo 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000' | tee /etc/apt/preferences.d/mozilla
+RUN apt-get update && apt-get install -y \
+    firefox \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install TigerVNC
+RUN apt-get update && apt-get install -y \
+    tigervnc-standalone-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====noVNC=====
+
+# Install noVNC
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y novnc && \
+    rm -rf /var/lib/apt/lists/*
+
+# Link vnc.html to index.html
+RUN ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+
+# Configure supervisor to manage the noVNC server
+RUN cat <<EOF > /etc/supervisor/conf.d/novnc.conf
+[program:novnc]
+command=/usr/share/novnc/utils/novnc_proxy --listen 0.0.0.0:6080 --vnc localhost:5900
+stderr_logfile=/var/log/novnc.err.log
+stdout_logfile=/var/log/novnc.out.log
+EOF
+
+# =====Code Server=====
+
+# Install code-server
+# Ref: https://coder.com/docs/code-server/install#debian-ubuntu
+RUN CODE_SERVER_VERSION=4.125.0 \
+    && curl -fOL https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_amd64.deb \
+    && dpkg -i code-server_${CODE_SERVER_VERSION}_amd64.deb \
+    && rm code-server_${CODE_SERVER_VERSION}_amd64.deb
+
+# Configure supervisor to manage the code-server
+RUN cat <<EOF > /etc/supervisor/conf.d/code-server.conf
+[program:code-server]
+command=code-server --host 0.0.0.0 --port 8080
+stderr_logfile=/var/log/code-server.err.log
+stdout_logfile=/var/log/code-server.out.log
+EOF
+
+# =====Jupyter Lab=====
+
+# Install pip and Jupyter Lab
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install jupyterlab --break-system-packages --ignore-installed
+# --break-system-packages required on Ubuntu 24.04 (PEP 668)
+# --ignore-installed avoids RECORD file conflicts with debian-managed packages (e.g. typing_extensions)
+# Set default Jupyter Lab shell to bash
+ENV SHELL=/bin/bash
+
+# =====Move all password settings to the end=====
+
+# Set the password for the root user
+ARG SSH_PASSWORD
+RUN if [ -z "${SSH_PASSWORD}" ]; then \
+    # Allow empty password login
+    passwd -d root && \
+    sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords yes/' /etc/ssh/sshd_config; \
+else \
+    # Set password for root user
+    echo "root:${SSH_PASSWORD}" | chpasswd; \
+fi
+
+# Set the password for VNC
+RUN touch ~/.Xauthority
+ARG TIGERVNC_PASSWORD
+RUN mkdir -p ~/.vnc && \
+    echo "${TIGERVNC_PASSWORD}" | vncpasswd -f > ~/.vnc/passwd && \
+    chmod 600 ~/.vnc/passwd
+# dbus-launch required on Ubuntu 24.04 for XFCE to start properly in VNC
+RUN cat <<'EOF' > ~/.vnc/xstartup
+#!/bin/sh
+exec dbus-launch --exit-with-session startxfce4
+EOF
+RUN chmod +x ~/.vnc/xstartup
+
+# Configure supervisor to manage the TigerVNC server
+RUN if [ -z "${TIGERVNC_PASSWORD}" ]; then FLAG="-SecurityTypes None --I-KNOW-THIS-IS-INSECURE"; else FLAG=""; fi && \
+cat <<EOF > /etc/supervisor/conf.d/tigervnc.conf
+[program:tigervnc]
+command=/usr/bin/vncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no ${FLAG}
+environment=__EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+stderr_logfile=/var/log/tigervnc.err.log
+stdout_logfile=/var/log/tigervnc.out.log
+EOF
+
+# Set the password for code-server
+ARG CODE_SERVER_PASSWORD
+RUN if [ -z "${CODE_SERVER_PASSWORD}" ]; then AUTH="none"; else AUTH="password"; fi && \
+mkdir -p ~/.config/code-server/ && \
+cat <<EOF > ~/.config/code-server/config.yaml
+bind-addr: 0.0.0.0:8080
+auth: ${AUTH}
+password: ${CODE_SERVER_PASSWORD}
+cert: false
+EOF
+
+# Configure supervisor to manage the Jupyter Lab server
+ARG JUPYTER_LAB_TOKEN
+RUN cat <<EOF > /etc/supervisor/conf.d/jupyter-lab.conf
+[program:jupyter-lab]
+command=jupyter lab --allow-root --ip=0.0.0.0 --no-browser --notebook-dir=/ --ServerApp.token="${JUPYTER_LAB_TOKEN}"
+stderr_logfile=/var/log/jupyter-lab.err.log
+stdout_logfile=/var/log/jupyter-lab.out.log
+EOF
+# We intentionally use `--ServerApp.*` instead of `--NotebookApp.*` as Ubuntu 24.04 ships with JupyterLab 4+ which deprecates NotebookApp
+
+# =====Shell environment=====
+
+RUN cat >> /root/.bashrc <<'EOF'
+
+# ROS 2 Jazzy
+source /opt/ros/jazzy/setup.bash
+source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# Optionally run rosdep update on first shell launch
+if [ ! -d /root/.ros/rosdep/sources.cache ]; then
+    rosdep update --rosdistro jazzy
+fi
+
+# Isaac Sim
+export ISAACSIM_PATH=/root/isaacsim
+export ISAACSIM_PYTHON_EXE=${ISAACSIM_PATH}/python.sh
+EOF
+
+CMD ["/usr/bin/supervisord", "-n"]

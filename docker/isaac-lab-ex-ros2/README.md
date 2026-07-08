@@ -19,6 +19,9 @@ docker push j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy
 # Isaac Lab 3.0.0-beta2 (Isaac Sim 6.0.0) + ROS 2 Jazzy
 docker build -t j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy -f docker/isaac-lab-ex-ros2/Dockerfile_3_0_0_beta2_ros2_jazzy .
 docker push j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy
+# Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) + ROS 2 Jazzy
+docker build -t j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy -f docker/isaac-lab-ex-ros2/Dockerfile_3_0_0_beta2_patch1_ros2_jazzy .
+docker push j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy
 ```
 
 > **Note:** These images are self-contained (Ubuntu 24.04 base, not the official Isaac Lab container) and download Isaac Sim (~10 GB) during the build. Build time is significantly longer than the other variants. They include Isaac Lab and ROS 2 Jazzy.
@@ -33,6 +36,7 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 |-----------|-----------|-------|-----------|
 | 2.3.2 | 5.1.0 | Jazzy | j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy |
 | 3.0.0-beta2 | 6.0.0 | Jazzy | j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy |
+| 3.0.0-beta2.patch1 | 6.0.1 | Jazzy | j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy |
 
 ## Brev
 
@@ -66,7 +70,13 @@ docker run --rm -it --gpus all -e "ACCEPT_EULA=Y" \
   -v ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw \
   -v ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw \
   -v $(pwd):/app \
-  j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy  # or :3.0.0-beta2-ros2-jazzy
+  j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy  # or :3.0.0-beta2-ros2-jazzy / :2.3.2-ros2-jazzy
+```
+
+You can also use the Docker Compose files:
+
+```sh
+docker compose -f docker/isaac-lab-ex-ros2/compose_3_0_0_beta2_patch1_ros2_jazzy.yaml up
 ```
 
 ## Developer Notes
