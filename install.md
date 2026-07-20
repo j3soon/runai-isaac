@@ -179,11 +179,12 @@ To simplify the user creation process, we can use [the Runai API](https://api-do
 
 Since users are trusted to create custom Environments and Templates by themselves, we now only need to create `Compute resources` and `Data sources` for them.
 
-1. Create 0~8 GPU compute resources.
+1. Create 0~8 GPU compute resources and remove defaults.
 
    ```sh
    source secrets/env.sh
    scripts/admin/create_compute.sh
+   scripts/admin/remove_default_compute.sh
    ```
 
 2. Set up FTPS.
