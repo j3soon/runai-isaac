@@ -95,6 +95,16 @@ Use the OpenVPN Connect v3 GUI to connect to the VPN:
 - MacOS users: Follow the [official guide](https://openvpn.net/client-connect-vpn-for-mac-os/).
 - Linux users: Use the command line to install OpenVPN 3 Client by following [the official guide](https://openvpn.net/cloud-docs/owner/connectors/connector-user-guides/openvpn-3-client-for-linux.html).
 
+  Specifically, for Ubuntu, install with the following:
+
+  ```sh
+  sudo mkdir -p /etc/apt/keyrings && curl -fsSL https://packages.openvpn.net/packages-repo.gpg | sudo tee /etc/apt/keyrings/openvpn.asc
+  DISTRO=$(lsb_release -c -s)
+  echo "deb [signed-by=/etc/apt/keyrings/openvpn.asc] https://packages.openvpn.net/openvpn3/debian $DISTRO main" | sudo tee /etc/apt/sources.list.d/openvpn-packages.list
+  sudo apt update
+  sudo apt install openvpn3
+  ```
+
   Then, copy your `.ovpn` client config file to `secrets/client.ovpn` and install the config, and connect to the VPN with:
   
   ```sh
