@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Run:ai Application"
+  short_description: "Add repository-styled Run:ai Docker applications"
+  default_prompt: "Use $add-runai-application to add a Docker-backed Run:ai application to this repository."

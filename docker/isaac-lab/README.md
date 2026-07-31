@@ -105,3 +105,25 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
 As you can see, this example only logs results and does not save any checkpoints or output files. For real-world workloads, make sure to place your code in the `/mnt/nfs/<YOUR_USERNAME>` directory and save any checkpoints or outputs there. This ensures your results are preserved even after the container is terminated.
 
 Basically, you'll want to store your modified Isaac Lab codebase under the `/mnt/nfs/<YOUR_USERNAME>` directory and run the workload using the scripts from `/mnt/nfs/<YOUR_USERNAME>`.
+
+## Distributed training on Run:ai
+
+Isaac Lab 2.3.2 supports multi-GPU and multi-node training on Linux for the RL-Games, RSL-RL, and skrl workflows. Each GPU runs a separate Isaac Lab process, so set `--nproc_per_node` to the number of GPUs allocated to each pod. See the Isaac Lab 2.3.2 [multi-GPU and multi-node training guide](https://isaac-sim.github.io/IsaacLab/v2.3.2/source/features/multi_gpu.html) for the commands for each supported workflow.
+
+For multi-GPU training within one Run:ai workspace, select a multi-GPU compute resource and update the environment command. For example, with `gpu-x2`:
+
+```sh
+/run.sh "/workspace/isaaclab/isaaclab.sh -p -m torch.distributed.run --nnodes=1 --nproc_per_node=2 /workspace/isaaclab/scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless --distributed"
+```
+
+For multi-node training, follow the Run:ai [distributed PyTorch tutorial](https://run-ai-docs.nvidia.com/self-hosted/tutorials/training-tutorials/distributed-pytorch) to create a **Distributed** PyTorch **Training** environment and submit it using the **Worker & master** configuration. The master also participates in training, so one master plus one worker corresponds to `--nnodes=2`. Select the same compute resource for every pod; for example, `gpu-x8` gives 8 processes per node and 16 processes in total.
+
+Run:ai's PyTorch operator supplies the node count, processes per node, rank, and rendezvous settings to `torchrun`. Leave those launcher options unset so `torchrun` consumes the operator-provided values:
+
+```sh
+/run.sh "/workspace/isaaclab/isaaclab.sh -p -m torch.distributed.run /workspace/isaaclab/scripts/reinforcement_learning/rl_games/train.py --task=Isaac-Cartpole-v0 --headless --distributed"
+```
+
+Keep **Allow different setup for the master** disabled so all pods use the same GPU count, training code, and mounted data. Save checkpoints and outputs on shared persistent storage rather than the container filesystem. If physical node separation is required, also use the appropriate Run:ai node-pool or scheduling controls; each distributed pod is a `torchrun` node, but Kubernetes may otherwise place multiple pods on one physical host.
+
+Isaac Lab uses NCCL for distributed PyTorch training. If NCCL initialization fails, first verify that the cluster permits pod-to-pod traffic on `MASTER_PORT`. The optional `NCCL_SHM_DISABLE=1`, `NCCL_IB_DISABLE=1`, or `NCCL_ALGO=Ring` workarounds from the upstream guide should only be applied when troubleshooting, because they can affect communication performance.

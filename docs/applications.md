@@ -7,6 +7,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 ## Application Guides
 
 - [All-In-One Interactive Workspace](../docker/all-in-one/README.md)
+- [PyTorch Distributed MNIST](../docker/pytorch-mnist-dist/README.md)
 - [Isaac Sim Headless Workspace](../docker/isaac-sim/README.md)
 - [Isaac Sim (Extended) Interactive Workspace](../docker/isaac-sim-ex/README.md)
 - [Isaac Sim (Extended) with ROS 2](../docker/isaac-sim-ex-ros2/README.md)

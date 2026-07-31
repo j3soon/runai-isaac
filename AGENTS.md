@@ -4,11 +4,12 @@
 This repository is a documentation-and-assets workspace for running NVIDIA Isaac workloads on Run:ai, with supporting Docker images and shell utilities.
 
 - `docker/`: Dockerfiles and image-specific assets (for example `docker/pytorch-mnist/Dockerfile`, `docker/isaac-sim/`, `docker/isaac-lab/`).
-- For products with multiple major model/image variants (for example Cosmos, GR00T), prefer separate versioned folders (for example `docker/<name>-n1/`, `docker/<name>-n1.6/`) and matching versioned docs pages under `docs/applications/`.
+- Keep each Docker-backed application and its guide together under `docker/<name>/` unless an established product layout requires otherwise.
+- For products with multiple major model/image variants (for example Cosmos, GR00T), prefer separate versioned folders (for example `docker/<name>-n1/`, `docker/<name>-n1.6/`) and matching versioned application guides.
 - `scripts/`: Operational shell scripts, grouped by purpose (`scripts/docker/run.sh`, `scripts/admin/`, `scripts/vpn/`).
 - `docs/`: User/developer documentation and screenshots (`docs/assets/`).
 - `thirdparty/omnicli/`: Bundled Omniverse CLI binaries used by `/run.sh`.
-- `.github/workflows/`: CI workflow(s), currently building/publishing the `runai-pytorch-mnist` image.
+- `.github/workflows/`: Per-image CI workflows for images built and published by this repository.
 
 ## Build, Test, and Development Commands
 - `docker build -t local/runai-pytorch-mnist -f docker/pytorch-mnist/Dockerfile .`: Build the example training image locally.
@@ -31,12 +32,21 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - If a Dockerfile depends on a pinned upstream commit/tag/sha, keep that pin in the Dockerfile and do not document ad-hoc user overrides in app guides unless the repo explicitly supports/testing that workflow.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
 
+## Adding Docker-Backed Applications
+- Before adding an application, inspect the closest existing Dockerfiles, application guides, image table, application index, and CI workflows. Follow the current repository conventions rather than copying a legacy file mechanically.
+- Verify upstream installation instructions and source references from authoritative sources. Record exact image versions, tags, commits, and compatibility constraints instead of relying on moving defaults.
+- Present a concise proposed file scope and resolve material questions such as image naming, versioning, workload type, and publishing before implementation.
+- A published application normally needs a Dockerfile, an adjacent `README.md`, an entry in the root pre-built image table, an entry in `docs/applications.md`, and a per-image CI workflow when automated publishing is requested.
+- Keep image names, tags, build commands, environment commands, and version references consistent across the Dockerfile, guide, indexes, and CI.
+- Do not stage, unstage, or otherwise change the Git index unless the user explicitly requests it. Preserve unrelated working-tree changes.
+
 ## Testing Guidelines
 There is no comprehensive automated test suite in this repo. Validate changes by:
 
 - Building the affected Docker image(s).
 - Running a syntax check for modified shell scripts (`bash -n`).
 - Performing a targeted manual smoke test for behavior changes (for example admin/vpn script flags).
+- For new applications, verify documentation commands against the built image and include reproducible local testing and cleanup steps when practical.
 
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative commit subjects such as `Add ...`, `Update ...`, `Upgrade ...`, and `Change ...`. Follow that pattern and keep one logical change per commit.

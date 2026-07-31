@@ -503,6 +503,19 @@ References:
 - [关于nginx-ingress-controller中worker参数的差异分析](https://zhuanlan.zhihu.com/p/359700475)
 - [追踪nginx ingress最大打开文件数问题](https://ieevee.com/tech/2019/09/29/ulimit.html)
 
+## Distributed Training
+
+Install Kubeflow Training Operator and MPI Operator following slightly modified commands from [the docs](https://run-ai-docs.nvidia.com/saas/getting-started/installation/install-using-helm/system-requirements#distributed-training):
+
+```sh
+kubectl apply --server-side -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.9.2"
+kubectl patch deployment training-operator -n kubeflow --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args", "value": ["--enable-scheme=tfjob", "--enable-scheme=pytorchjob", "--enable-scheme=xgboostjob", "--enable-scheme=jaxjob"]}]'
+kubectl delete crd mpijobs.kubeflow.org
+kubectl apply --server-side --force-conflicts -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
+```
+
+After the operators are installed, follow the [PyTorch Distributed MNIST guide](./docker/pytorch-mnist-dist/README.md) to submit a Worker & master workload from the Run:ai flexible UI. The workload steps are based on NVIDIA's [distributed training quick start](https://run-ai-docs.nvidia.com/self-hosted/workloads-in-nvidia-run-ai/using-training/quick-starts/distributed-training-quickstart).
+
 ## Miscellaneous
 
 Some cluster admin notes for future reference.
