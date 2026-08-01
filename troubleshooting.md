@@ -162,9 +162,9 @@ Open a terminal in the launched JupyterLab and run the NVBandwidth test. Its com
 
 ```sh
 mkdir -p /mnt/nfs/j3soon
-cd /workspace/nvbandwidth
-set -o pipefail
-./nvbandwidth 2>&1 | tee "/mnt/nfs/j3soon/nvbandwidth_output_$(date +%Y%m%d_%H%M%S).log"
+cd /mnt/nfs/j3soon
+git clone https://github.com/j3soon/hpc-samples
+./hpc-samples/src/scripts/intranode-comm-test.sh
 ```
 
 Delete the workspace after troubleshooting to release all eight GPUs:
