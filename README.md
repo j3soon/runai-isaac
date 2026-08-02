@@ -558,6 +558,7 @@ STORAGE_NODE_IP=<YOUR_STORAGE_NODE_IP>
 STORAGE_NFS_PATH=<YOUR_STORAGE_NFS_PATH>
 runai workspace submit ${RUNAI_USER}-pytorch-mnist \
   --image j3soon/runai-pytorch-mnist \
+  --image-pull-policy Always \
   --node-pools prod \
   --preemptible \
   --large-shm \

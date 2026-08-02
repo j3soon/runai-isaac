@@ -1,0 +1,4 @@
+interface:
+  display_name: "Launch Run:ai Workload"
+  short_description: "Validate and launch Run:ai GPU workloads"
+  default_prompt: "Use $launch-runai-workload to validate and launch my workload on NVIDIA Run:ai."
