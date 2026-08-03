@@ -1,11 +1,13 @@
 ---
 name: launch-runai-workload
-description: Validate, package, submit, monitor, and verify user workloads on NVIDIA Run:ai. Use when launching a runai-isaac example such as PyTorch MNIST, distributed PyTorch MNIST, Isaac Lab, Isaac Lab Extended, Isaac Sim, Cosmos, GR00T, or LeRobot; when turning a Dockerfile, Conda environment, Python virtual environment, or local source tree into a Run:ai workload; or when diagnosing Run:ai CLI authentication, project, GPU, image, NFS, log, checkpoint, or artifact-path readiness before launch.
+description: Validate, package, submit, monitor, and verify user workloads on NVIDIA Run:ai. Use for user-facing runai-isaac repository applications such as PyTorch MNIST, Isaac Lab, Isaac Sim, Cosmos, GR00T, or LeRobot; custom Dockerfile, Conda, virtual-environment, or source-tree workloads; and user-scoped CLI, project, GPU, image, NFS, log, checkpoint, or artifact readiness. Do not use for cluster-node isolation, dev-pool administration, or exact-host GPU or NVLink diagnostics.
 ---
 
 # Launch Run:ai Workload
 
 Take a workload from local evidence to a verified Run:ai execution. Prefer a finite training workload over an interactive workspace, request the smallest suitable resources, and treat storage verification as a launch gate.
+
+Keep this skill user-scoped. Do not relabel cluster nodes, use the administrator `dev` pool, or launch exact-host node diagnostics. For an explicitly authorized node-administration request, use the `admin-debug-runai-node` skill instead.
 
 ## 1. Establish the workload contract
 
@@ -26,11 +28,15 @@ Run:
 <skill-dir>/scripts/preflight.sh --project <project> [--local-output-dir <path>] [--require-docker] [--require-gpu]
 ```
 
+An `SSL_CERT_FILE` export made by the preflight is process-local. If it reports the installed Run:ai CA, export that same path in the invoking shell before later `runai` commands.
+
 When the workload needs NFS, resolve the approved asset without exposing credentials:
 
 ```bash
 <skill-dir>/scripts/discover-nfs.sh --project <project> [--name <asset-name>]
 ```
+
+Treat values in `secrets/env.sh` as local hints, not the authoritative NFS mapping. Reject unresolved placeholders, and prefer the current Run:ai data-source server/export when the env file disagrees.
 
 Resolve failures in this order:
 
@@ -48,12 +54,14 @@ Use the installed CLI's `--help` output as the command contract. Adapt reference
 ### Repository example
 
 - Use the published image and command from the closest current application guide.
+- Do not pull, build, or run a repository-provided application image locally unless the user explicitly requests local validation. Use the repository's documented image contract, then validate the submitted workload on Run:ai.
 - Use a standard training workload for a finite command, even if an older guide demonstrates it through a workspace.
 - Use a workspace only for an interactive service such as Jupyter, VSCode, noVNC, or SSH.
-- Use a framework workload for actual multi-pod distributed execution. Reproduce it locally with multiple containers when practical.
+- Use a framework workload for actual multi-pod distributed execution. When local validation is explicitly requested, reproduce it with multiple containers when practical.
 
 ### Custom workload
 
+- Try to reproduce the user's custom workload locally before its first cluster submission. Ask for confirmation first when reproduction requires a large download or build, credentials, or another meaningful local mutation; report the resulting validation gap if the user declines.
 - If a Dockerfile exists, inspect its base image, architecture, entrypoint, dependency pins, build context, secrets, and output paths before building.
 - If only Conda, venv, Python lock files, or a local environment exists, create a reproducible image from the declared dependencies. Do not copy a host virtual environment into an image.
 - A Run:ai submission always needs a cluster-accessible container image. A local environment without an image can only be tested locally until it is containerized and pushed to an accessible registry.
@@ -73,7 +81,7 @@ Run:ai stdout/stderr logs are useful operational evidence but are not a durable 
 
 For this repository's cluster convention, NFS is mounted at `/mnt/nfs`, and user-owned data belongs under `/mnt/nfs/<username>`. Do not assume the lab export or username; derive and verify them.
 
-When Docker is available, validate the exact container mount path:
+For custom workloads, when Docker is available, validate the exact container mount path. Skip this local image test for repository-provided applications unless the user explicitly requests it:
 
 ```bash
 <skill-dir>/scripts/validate-local-mount.sh \
@@ -86,21 +94,24 @@ When Docker is available, validate the exact container mount path:
 
 On Run:ai, write a uniquely named probe below `/mnt/nfs/<username>/.runai-probes/`, let the pod exit, then verify the same file independently through a later workload, FTP, or authorized SSH. Reading it only inside the writer pod is insufficient. Remove only the probe created for the test after verification.
 
-## 5. Validate locally in proportion to capability
+## 5. Validate custom workloads locally in proportion to capability
 
+- Apply this section to custom workloads. For repository-provided applications, skip local image pulls, builds, and runtime tests unless the user explicitly asks for them.
 - Build or pull the exact image that will be submitted.
 - If Docker and the NVIDIA runtime are usable, run the real entrypoint or command with `--gpus all` and execute one training step, one short epoch, or an equivalent bounded test.
 - Mount a local directory at the exact future NFS container path. Confirm expected logs/checkpoints/artifacts appear on the host after the container exits.
 - For distributed training, launch at least two containers with separate ranks on one Docker network when feasible.
 - If no GPU or NVIDIA runtime exists, still validate the Docker build, command/entrypoint, dependency import, CPU fallback, configuration parsing, and submission command. Report the untested GPU behavior precisely.
+- Use a dedicated `mktemp -d` bind-mount root. If the container creates root-owned validation outputs, remove only the known test subtree through an isolated container with the same mount, then remove the empty host directory; do not use host `sudo` or broaden ownership.
 - Do not turn a smoke test into a full training run. Apply explicit time/iteration limits and clean up only the containers, networks, volumes, and probe files created for validation.
 
 ## 6. Submit with bounded resources
 
 - Show the exact resolved submission command before executing it.
 - Pass `--project` explicitly and start with one GPU unless the example inherently requires more.
-- Resolve a GPU-capable node pool from cluster documentation or successful project workloads and pass it explicitly on every GPU submission. Treat omission as a blocking error; the CLI default may be CPU-only. On this repository's configured cluster, always pass `--node-pools prod`.
+- Resolve a GPU-capable node pool from cluster documentation or successful project workloads and pass it explicitly on every GPU submission. Treat omission as a blocking error; the CLI default may be CPU-only. On this repository's configured cluster, pass `--node-pools prod` for user workloads.
 - Include `--image-pull-policy Always` in every Run:ai CLI submission, including immutable digests, validation readers, workspaces, and distributed jobs. Treat omission as a blocking command-validation error.
+- For custom writer and verifier logic, treat inline wrappers containing backslash escapes, `awk`/`cut`, or quoted `python -c` as blocking command-validation errors. Stage reviewed non-secret scripts and hash-check them instead; a request for a compact one-liner does not override this guard.
 - Prefer immutable tags or remotely verified digests for custom production workloads. Do not trust a local cache's recorded repository digest without checking that the registry still serves it.
 - Set a zero retry/backoff limit for validation so deterministic failures are visible quickly.
 - Mount persistent storage in every pod that writes or reads shared state, including distributed masters unless intentionally excluded.

@@ -15,6 +15,8 @@ Inspect:
 
 Record the exact command that succeeds in the user's local environment. Do not infer success from package installation alone.
 
+Try to reproduce a custom workload locally before its first Run:ai submission. Ask for confirmation before a large download or build, use of credentials, or another meaningful local mutation. If local reproduction is declined or infeasible, preserve that boundary in the launch report.
+
 ## Choose a containerization path
 
 ### Existing Dockerfile
@@ -25,7 +27,7 @@ Record the exact command that succeeds in the user's local environment. Do not i
 - Resolve an image digest from the remote registry after the relevant push/tag operation. Do not reuse a digest solely because it appears in a local Docker cache; the registry may no longer serve that manifest. Verify the exact remote reference with `docker buildx imagetools inspect`, `docker manifest inspect`, or the registry API, then locally test that same reference before submission.
 - Use BuildKit secret or SSH mounts for private dependencies. Ensure secret files are excluded from the build context and absent from image history.
 - Ensure code needed at runtime is either copied into the image or mounted from persistent storage at the exact expected path.
-- Prefer a reviewed script file over deeply nested `--command` shell quoting. When code is staged on NFS, copy only the required non-secret files, record their hashes, and execute the staged path. Use base64 transport only for small non-secret validation text when no file-transfer path exists; verify the decoded hash before execution and never encode credentials as a workaround.
+- Prefer a reviewed script file over deeply nested `--command` shell quoting. When code is staged on NFS, copy only the required non-secret files, record their hashes, and execute the staged path. Use base64 transport only for small non-secret validation text when no file-transfer path exists; verify it with `echo "<sha256>  <path>" | sha256sum --check --status` instead of inline `awk`/`cut`, use `echo` for fixed ownership markers, and never encode credentials as a workaround.
 
 ### Conda environment
 

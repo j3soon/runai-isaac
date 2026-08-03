@@ -4,7 +4,7 @@ These patterns target the repository's tested CLI 2.23 family. Run `runai versio
 
 Every Run:ai CLI submit command must include `--image-pull-policy Always`, including commands that use an immutable image digest. Verify this flag in the exact resolved command before executing it.
 
-Every GPU submit command must also include an explicit node pool; do not trust the CLI default. On this repository's configured cluster, always pass `--node-pools prod`.
+Every GPU submit command must also include an explicit node pool; do not trust the CLI default. On this repository's configured cluster, pass `--node-pools prod` for user workloads. Node administration and the `dev` pool belong to the `admin-debug-runai-node` skill.
 
 ## Readiness
 
@@ -46,6 +46,8 @@ If only the asset name is known, run:
 
 The helper retrieves the mapping read-only through the authorized Run:ai data-source API (`GET /api/v1/asset/datasource?projectId=<id>`) and prints only normalized NFS fields. CLI `2.23` requires `runai auth get-token --output plaintext`; its default token output is kubeconfig text and cannot be placed directly in a bearer header. Keep the token in memory and out of terminal output and files. Do not guess a server/export pair from naming alone.
 
+Use `secrets/env.sh` only as a cross-check. Reject values such as `<FTP_USER>` and prefer the current project data-source mapping when `STORAGE_NODE_IP` disagrees with its server.
+
 The repository convention uses one lab-scoped export mounted at `/mnt/nfs`, with user-owned paths below `/mnt/nfs/<username>`. Verify the selected project belongs to the same lab scope.
 
 ## Finite single-pod training
@@ -68,7 +70,7 @@ runai training standard submit <name> \
 
 Omit GPU or large shared memory only when the application and cluster policy permit it. Omitting `--command` preserves the image entrypoint and treats values after `--` as arguments.
 
-For a multi-line custom program, prefer executing a reviewed script from the image or confirmed NFS path. Avoid layers of shell quoting that cannot be inspected reliably in `describe`. If a small non-secret validation snippet must be transported inline, verify its decoded content/hash and inspect the resolved workload command before treating the result as valid.
+For custom writer and verifier logic, execute reviewed scripts from the image or confirmed NFS path; do not embed them in quoted `python -c` commands. Treat backslash escapes and nested quote-dependent expressions in an inline wrapper as a command-validation error because CLI serialization may change them. Use `echo` for fixed newline-terminated markers and `echo "<sha256>  <path>" | sha256sum --check --status` for staged-file hashes. Inspect the resolved workload command before treating the result as valid.
 
 ## Interactive workspace
 

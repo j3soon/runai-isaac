@@ -8,6 +8,7 @@ Use this catalog for the common examples, then inspect the referenced guide in t
 - Use the latest explicitly documented version unless the user names a version or compatibility requires an older one. Never invent a tag.
 - Prefer `runai training standard submit` for finite single-pod tests, `runai workspace submit` for interactive services, and `runai training pytorch submit` for multi-pod PyTorch.
 - Read the image guide for its `/run.sh` command, security/user setting, required ports, shared-memory needs, and persistent-output notes.
+- Do not pull, build, or run repository-provided application images locally unless the user explicitly requests local validation. Validate them through bounded Run:ai execution instead.
 
 ## PyTorch MNIST
 
@@ -28,7 +29,7 @@ Use this catalog for the common examples, then inspect the referenced guide in t
 
 - Guide: `docker/pytorch-mnist-dist/README.md`.
 - Image: `j3soon/runai-pytorch-dist-mnist`.
-- Local validation: use the documented two-container CPU/Gloo procedure or an equivalent two-rank GPU test.
+- When local validation is explicitly requested, use the documented two-container CPU/Gloo procedure or an equivalent two-rank GPU test.
 - Cluster mode: PyTorch training with one master plus one worker for the smallest distributed test. Request one GPU for the master and one for the worker.
 - The image entrypoint already runs `/opt/mnist/src/mnist.py`. Prefer passing bounded arguments such as `--epochs 1` rather than overriding it. The PyTorch operator supplies rank and rendezvous environment variables.
 - A tested CLI `2.23` submission is:
@@ -91,6 +92,6 @@ Use this catalog for the common examples, then inspect the referenced guide in t
 2. Read its adjacent `docker/<application>/README.md` and Dockerfile.
 3. Classify it as headless finite, interactive `-ex`, or distributed.
 4. Extract the exact image tag, `/run.sh` command, ports, GPU/shared-memory requirements, dependency manager, and persistence notes.
-5. Create a bounded local test and a smaller Run:ai validation job before launching the user's full command.
+5. Skip local image validation unless the user explicitly requests it; use a smaller Run:ai validation job before launching the user's full command.
 
 Do not mechanically reuse an Isaac Lab command for Isaac Sim, Cosmos, GR00T, LeRobot, or NVHPC. Their entrypoints, dependency managers, licenses, model downloads, credentials, and resource requirements differ.

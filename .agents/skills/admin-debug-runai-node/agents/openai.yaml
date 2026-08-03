@@ -1,0 +1,4 @@
+interface:
+  display_name: "Admin Debug Run:ai Node"
+  short_description: "Isolate and diagnose Run:ai GPU nodes"
+  default_prompt: "Use $admin-debug-runai-node to isolate and diagnose an explicitly authorized Run:ai GPU node."

@@ -24,9 +24,17 @@ and report to admin.
 NODE_NAME="<TARGET_NODE>"
 
 kubectl label node "${NODE_NAME}" j3soon/runai-node-pool=dev --overwrite
+
+kubectl get node "${NODE_NAME}" -L j3soon/runai-node-pool
+kubectl get node "${NODE_NAME}" \
+  -o jsonpath='{.status.capacity.nvidia\.com/gpu}{" capacity, "}{.status.allocatable.nvidia\.com/gpu}{" allocatable\n"}'
 ```
 
+Before submitting the diagnostic, require the node to be `Ready`, labeled for `dev`, and reporting all eight GPUs as both capacity and allocatable. If Run:ai reports `MaxNodePoolResources` or no GPU resources in `dev`, re-check these node-side conditions; suspending, resuming, or recreating the workload will not repair a broken node.
+
 After the node has been isolated in the `dev` node pool, use the [Run:ai REST API node-affinity field](https://run-ai-docs.nvidia.com/api/api-guides/using-node-affinity-via-api) to launch a preemptible 8-GPU diagnostic workspace on its exact hostname. The CLI does not expose general required node affinity: `--node-type` requires a separate `run.ai/type` label, while `--required-pod-topology-key` groups workload pods and does not select a hostname. The REST API can directly match the built-in `kubernetes.io/hostname` label.
+
+Do not pass `--required-pod-topology-key kubernetes.io/hostname=<NODE_NAME>`. CLI 2.23 can serialize the entire `key=value` string as a topology-key name, causing pod creation to fail Kubernetes validation.
 
 This requires `curl`, `jq`, and an authenticated Run:ai CLI session:
 
@@ -34,6 +42,7 @@ This requires `curl`, `jq`, and an authenticated Run:ai CLI session:
 export SSL_CERT_FILE="$HOME/.runai/certs/root-ca.crt"
 NODE_NAME="<TARGET_NODE>"
 WORKSPACE_NAME=nvlink-diagnostic
+RUNAI_AUTHORIZED_USER="<RUNAI_USER_EMAIL>"
 NFS_NAME="<NFS_NAME>"
 NFS_SERVER="<NFS_SERVER>"
 NFS_PATH="<NFS_PATH>"
@@ -55,6 +64,7 @@ jq -n \
   --arg nfsServer "${NFS_SERVER}" \
   --arg nfsPath "${NFS_PATH}" \
   --arg nfsMountPath "${NFS_MOUNT_PATH}" \
+  --arg authorizedUser "${RUNAI_AUTHORIZED_USER}" \
   --arg args 'jupyter lab --allow-root --ip=0.0.0.0 --no-browser --notebook-dir=/ --NotebookApp.base_url=/${RUNAI_PROJECT}/${RUNAI_JOB_NAME} --NotebookApp.token=' \
   '{
     name: $name,
@@ -63,7 +73,7 @@ jq -n \
     spec: {
       args: $args,
       compute: {gpuDevicesRequest: 8, largeShmRequest: true},
-      exposedUrls: [{container: 8888}],
+      exposedUrls: [{container: 8888, authorizedUsers: [$authorizedUser]}],
       image: "j3soon/hpc-samples:nvhpc-25.7-devel-cuda12.9-ubuntu24.04",
       imagePullPolicy: "Always",
       nodeAffinityRequired: {
@@ -111,6 +121,7 @@ If exact hostname selection is unnecessary, use the CLI to target the `dev` node
 export SSL_CERT_FILE="$HOME/.runai/certs/root-ca.crt"
 RUNAI_PROJECT="<YOUR_PROJECT>"
 WORKSPACE_NAME=nvlink-diagnostic
+RUNAI_AUTHORIZED_USER="<RUNAI_USER_EMAIL>"
 NFS_SERVER="<NFS_SERVER>"
 NFS_PATH="<NFS_PATH>"
 NFS_MOUNT_PATH=/mnt/nfs
@@ -125,7 +136,7 @@ runai workspace submit "${WORKSPACE_NAME}" \
   --large-shm \
   --user-group-source fromTheImage \
   --nfs "path=${NFS_PATH},server=${NFS_SERVER},mountpath=${NFS_MOUNT_PATH},readwrite" \
-  --external-url container=8888 \
+  --external-url "container=8888,authusers=${RUNAI_AUTHORIZED_USER}" \
   -- jupyter lab \
     --allow-root \
     --ip=0.0.0.0 \
@@ -151,9 +162,16 @@ runai workspace logs "${WORKSPACE_NAME}" \
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
   -- findmnt -T "${NFS_MOUNT_PATH}"
+NFS_PROBE="${NFS_MOUNT_PATH}/.runai-nfs-check-${WORKSPACE_NAME}"
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
-  -- python3 -c "import pathlib,tempfile; d=pathlib.Path('${NFS_MOUNT_PATH}'); f=tempfile.NamedTemporaryFile(mode='w+',prefix='.runai-nfs-check-',dir=d,delete=True); f.write('nfs-ok'); f.flush(); f.seek(0); assert f.read() == 'nfs-ok'; print('NFS read/write OK:', d); f.close()"
+  -- touch "${NFS_PROBE}"
+runai workspace exec "${WORKSPACE_NAME}" \
+  --project "${RUNAI_PROJECT}" \
+  -- test -f "${NFS_PROBE}"
+runai workspace exec "${WORKSPACE_NAME}" \
+  --project "${RUNAI_PROJECT}" \
+  -- rm -f "${NFS_PROBE}"
 ```
 
 Then select the workspace in the Run:ai UI and use `CONNECT > Jupyter`.
