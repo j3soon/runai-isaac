@@ -28,9 +28,14 @@ kubectl label node "${NODE_NAME}" j3soon/runai-node-pool=dev --overwrite
 kubectl get node "${NODE_NAME}" -L j3soon/runai-node-pool
 kubectl get node "${NODE_NAME}" \
   -o jsonpath='{.status.capacity.nvidia\.com/gpu}{" capacity, "}{.status.allocatable.nvidia\.com/gpu}{" allocatable\n"}'
+kubectl get pods --all-namespaces \
+  --field-selector "spec.nodeName=${NODE_NAME}" \
+  -o wide
+kubectl describe node "${NODE_NAME}" |
+  sed -n '/^Allocated resources:/,/^Events:/p'
 ```
 
-Before submitting the diagnostic, require the node to be `Ready`, labeled for `dev`, and reporting all eight GPUs as both capacity and allocatable. If Run:ai reports `MaxNodePoolResources` or no GPU resources in `dev`, re-check these node-side conditions; suspending, resuming, or recreating the workload will not repair a broken node.
+Before submitting the diagnostic, require the node to be `Ready`, labeled for `dev`, and reporting all eight GPUs as both capacity and allocatable. Capacity and allocatable confirm that Kubernetes advertises the devices; they do not show how many GPUs existing pods currently request. For this full-node diagnostic, also require the node's allocated resources to show zero requested GPUs and verify that no bound pod retains them. If Run:ai reports `MaxNodePoolResources` or no GPU resources in `dev`, re-check the node label, Ready state, advertised capacity, current allocations, `dev` pool availability, and project quota; suspending, resuming, or recreating the workload will not repair a node-side fault or free occupied GPUs.
 
 After the node has been isolated in the `dev` node pool, use the [Run:ai REST API node-affinity field](https://run-ai-docs.nvidia.com/api/api-guides/using-node-affinity-via-api) to launch a preemptible 8-GPU diagnostic workspace on its exact hostname. The CLI does not expose general required node affinity: `--node-type` requires a separate `run.ai/type` label, while `--required-pod-topology-key` groups workload pods and does not select a hostname. The REST API can directly match the built-in `kubernetes.io/hostname` label.
 
@@ -162,13 +167,17 @@ runai workspace logs "${WORKSPACE_NAME}" \
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
   -- findmnt -T "${NFS_MOUNT_PATH}"
-NFS_PROBE="${NFS_MOUNT_PATH}/.runai-nfs-check-${WORKSPACE_NAME}"
+NFS_PROBE_ID="${NODE_NAME}-${WORKSPACE_NAME}-$(date +%s)-$$"
+NFS_PROBE="${NFS_MOUNT_PATH}/.runai-nfs-check-${NFS_PROBE_ID}"
+NFS_MARKER="nfs-ok-${NFS_PROBE_ID}"
+printf '%s\n' "${NFS_MARKER}" |
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
-  -- touch "${NFS_PROBE}"
+  --stdin \
+  -- tee "${NFS_PROBE}" >/dev/null
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
-  -- test -f "${NFS_PROBE}"
+  -- grep -Fqx -- "${NFS_MARKER}" "${NFS_PROBE}"
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
   -- rm -f "${NFS_PROBE}"

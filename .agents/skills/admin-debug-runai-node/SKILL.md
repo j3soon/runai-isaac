@@ -20,15 +20,15 @@ Before taking admin or workload actions, read [references/admin-diagnostics.md](
 ## 2. Inspect before isolation
 
 - Read the node's current `j3soon/runai-node-pool` label and record it for possible restoration.
-- Check Ready state, taints, `nvidia.com/gpu` capacity and allocatable count, and relevant GPU Operator or device-plugin conditions.
+- Check Ready state, taints, `nvidia.com/gpu` capacity and allocatable count, current pod GPU requests, and relevant GPU Operator or device-plugin conditions. Treat allocatable as the scheduling ceiling, not the current free count.
 - Correlate the reported failure with workload `Bound`, admission, device-plugin, and scheduler events. Never diagnose the node solely from a failed application log.
 - If the node is not Ready or does not advertise the expected GPUs, report that state before trying to launch a full-node diagnostic.
 
 ## 3. Isolate the exact node
 
 - With explicit authorization, label only the resolved node into `dev` using the repository's documented node-pool label.
-- Verify the label change, Ready state, capacity, and allocatable GPUs after the node-pool controller reconciles.
-- Require all eight allocatable GPUs for the documented full-node HPC/NVLink workspace. Do not reduce the request merely to make a broken node schedulable.
+- Verify the label change, Ready state, advertised capacity, current pod allocations, and Run:ai pool/project availability after the node-pool controller reconciles.
+- Require all eight GPUs to be advertised and free for the documented full-node HPC/NVLink workspace. Do not reduce the request merely to make a broken node schedulable, and do not evict or delete an occupying workload without explicit authorization.
 - Do not use `prod` for an isolated-node diagnostic.
 
 ## 4. Build the diagnostic contract
@@ -50,7 +50,7 @@ Before taking admin or workload actions, read [references/admin-diagnostics.md](
 ## 6. Monitor and verify
 
 - Inspect events while Creating or Pending. Confirm the `Bound` event names the exact target node and reports node pool `dev` before running diagnostics.
-- Treat `MaxNodePoolResources` or “No node in the dev node-pool has GPU resources” as a node/pool capacity gate. Re-check label, Ready state, capacity, and allocatable GPUs before recycling the workload.
+- Treat `MaxNodePoolResources` or “No node in the dev node-pool has GPU resources” as a node/pool availability gate. Re-check the label, Ready state, advertised capacity, current pod GPU requests, `dev` pool availability, and project quota before recycling the workload.
 - Treat `Invalid value ... topologyKey` as evidence that the CLI pod-topology flag was misused; replace the failed workload with the REST affinity request.
 - Verify eight visible GPUs, the exact node hostname, the NFS mount and bounded read/write probe, Jupyter's listening message, and the identity-restricted URL.
 - Remove only the exact temporary NFS probe created during verification. Keep the real diagnostic workspace until the administrator finishes debugging or explicitly asks for cleanup.

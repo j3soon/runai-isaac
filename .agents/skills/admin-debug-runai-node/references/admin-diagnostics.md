@@ -17,9 +17,14 @@ kubectl label node <node> j3soon/runai-node-pool=dev --overwrite
 kubectl get node <node> -L j3soon/runai-node-pool
 kubectl get node <node> \
   -o jsonpath='{.status.capacity.nvidia\.com/gpu}{" capacity, "}{.status.allocatable.nvidia\.com/gpu}{" allocatable\n"}'
+kubectl get pods --all-namespaces \
+  --field-selector 'spec.nodeName=<node>' \
+  -o wide
+kubectl describe node <node> |
+  sed -n '/^Allocated resources:/,/^Events:/p'
 ```
 
-Require `Ready`, pool `dev`, and the diagnostic's full expected GPU count before submission. Kubernetes allocatable capacity is a launch gate, not something a workload retry can repair.
+Require `Ready`, pool `dev`, the diagnostic's full expected advertised GPU count, and enough currently unallocated GPUs before submission. Allocatable is the scheduling ceiling rather than a live free-device count; inspect bound pods and the node's allocated resources separately. Also verify `dev` pool availability and project quota. Do not evict or delete an occupying workload without explicit authorization.
 
 ## Exact placement
 
@@ -46,7 +51,7 @@ Use the root troubleshooting guide's complete payload. Keep `nodePools: ["dev"]`
 | Evidence | Meaning | Action |
 |---|---|---|
 | `FailedCreate` with invalid `topologyKey` | CLI pod-topology flag was used as hostname affinity | Delete only the failed diagnostic object and resubmit through REST node affinity. |
-| `MaxNodePoolResources` or no GPU resources in `dev` | Target is not reconciled into `dev`, is not Ready, or lacks advertised GPU capacity | Check the node label, Ready state, GPU capacity, and allocatable count. Do not relax placement or GPU count. |
+| `MaxNodePoolResources` or no GPU resources in `dev` | Target is not reconciled into `dev`, is not Ready, lacks advertised capacity, has GPUs requested by existing pods, or is blocked by pool/project availability | Check the node label, Ready state, advertised capacity, current pod GPU requests, `dev` pool availability, and project quota. Do not relax placement or GPU count. |
 | Pod binds to another node | Required hostname affinity is absent or wrong | Stop before diagnostics and correct the REST payload. |
 | NFS mount failure | Data-source server/export or node-side mount path is wrong or unavailable | Re-resolve the Run:ai data source; do not trust stale `secrets/env.sh` values. |
 | Jupyter URL exists but is not reachable | Container is not listening, base URL is wrong, or ingress authorization is incomplete | Inspect workspace logs and the resolved authorized-users setting. |
@@ -58,7 +63,7 @@ Require all of the following:
 1. `describe` shows Running and a `Bound` event for the exact node in `dev`.
 2. `nvidia-smi -L` in the workspace reports the expected GPUs.
 3. `findmnt -T /mnt/nfs` resolves the approved NFS export.
-4. A uniquely named probe can be created, checked, and removed from the approved NFS path.
+4. A uniquely named probe can be written, read back with its expected content, and removed from the approved NFS path.
 5. Jupyter logs show the expected base URL and listening port.
 6. The external URL is restricted to the authorized Run:ai identity.
 
