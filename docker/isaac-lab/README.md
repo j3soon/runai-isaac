@@ -4,6 +4,8 @@ This page is part of the sample applications guide. Follow [README](../../README
 
 We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headless training as an example for reinforcement learning workloads that don't require GUI interaction.
 
+For measured multi-GPU runs, see the [Isaac Lab 2.3.2 performance benchmark guide](./performance_benchmarks.md).
+
 1. (Optional) Create a docker image for Isaac Lab Workspace following the [docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
    ```sh
    docker build -t j3soon/runai-isaac-lab:2.1.0 -f docker/isaac-lab/Dockerfile_2_1_0 .
@@ -12,9 +14,11 @@ We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headle
    docker push j3soon/runai-isaac-lab:2.2.0
    docker build -t j3soon/runai-isaac-lab:2.3.2 -f docker/isaac-lab/Dockerfile_2_3_2 .
    docker push j3soon/runai-isaac-lab:2.3.2
+   docker build -t j3soon/runai-isaac-lab:3.0.0-beta2.patch1 -f docker/isaac-lab/Dockerfile_3_0_0_beta2_patch1 .
+   docker push j3soon/runai-isaac-lab:3.0.0-beta2.patch1
    ```
 
-   Available Dockerfiles: [`docker/isaac-lab/Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`docker/isaac-lab/Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`docker/isaac-lab/Dockerfile_2_3_2`](./Dockerfile_2_3_2).
+   Available Dockerfiles: [`Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`Dockerfile_2_3_2`](./Dockerfile_2_3_2), and [`Dockerfile_3_0_0_beta2_patch1`](./Dockerfile_3_0_0_beta2_patch1). The 3.0.0 beta image pins NVIDIA's `3.0.0-beta2-post1` image digest, which includes Isaac Sim 6.0.1 and the patch release fixes.
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 

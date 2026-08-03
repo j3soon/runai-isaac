@@ -1,0 +1,20 @@
+# Upstream: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-lab
+FROM nvcr.io/nvidia/isaac-lab:3.0.0-beta2-post1
+
+LABEL org.opencontainers.image.version="3.0.0-beta2.patch1"
+
+ENV ACCEPT_EULA=Y
+ENV SHELL=/bin/bash
+
+USER root
+
+# Tools and scripts for Omniverse
+COPY --chown=isaaclab:isaaclab thirdparty/omnicli /omnicli
+COPY --chown=isaaclab:isaaclab scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
+
+USER isaaclab
