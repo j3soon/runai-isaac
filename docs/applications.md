@@ -23,6 +23,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 - [Cosmos-Reason2](../docker/cosmos-reason2/README.md)
 - [Cosmos-Transfer1](../docker/cosmos-transfer1/README.md)
 - [Cosmos-Transfer2.5](../docker/cosmos-transfer2.5/README.md)
+- [Cosmos 3](../docker/cosmos3/README.md)
 - [NVHPC](../docker/nvhpc/README.md)
 
 ## Shared Appendix
