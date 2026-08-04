@@ -52,12 +52,17 @@ Use this catalog for the common examples, then inspect the referenced guide in t
 
 - The first pull of this large image can take several minutes. While it is healthy, `describe` shows both pods scheduled with image-pull events; do not misdiagnose that as a rendezvous failure.
 - Capture logs from both pods and require distinct rank/world-size messages plus an accuracy result.
+- Keep the default `gloo` backend. The upstream script uses `torch.device("cuda")` with no `LOCAL_RANK` mapping, so every local rank shares GPU 0 and `nccl` cannot run. This validates rendezvous and DDP, not GPU scaling.
+- Its `accuracy=` divides by the full test set while each rank samples `1/world_size` of it, so a bounded run reports roughly `0.1/world_size`. That is the expected metric artifact, not a failure.
 - This sample produces logs but no durable model checkpoint by default. Confirm that this is acceptable or adapt the script/output path before a real run.
 
 ## Isaac Lab headless
 
 - Guide: `docker/isaac-lab/README.md`.
-- Image: `j3soon/runai-isaac-lab:2.3.2` unless another documented version is selected.
+- Image: use the version documented for the workload. For the full performance
+  matrix or distributed Camera, use `j3soon/runai-isaac-lab:2.2.0`; the tested
+  2.3.2 renderer rejects nonzero local GPU ranks. Use the
+  `run-isaac-lab-benchmark` skill for benchmark runs.
 - Mode: standard training for finite headless jobs.
 - Baseline command:
 

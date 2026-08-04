@@ -4,7 +4,7 @@ This page is part of the sample applications guide. Follow [README](../../README
 
 We take [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html) headless training as an example for reinforcement learning workloads that don't require GUI interaction.
 
-For measured multi-GPU runs, see the [Isaac Lab 2.3.2 performance benchmark guide](./performance_benchmarks.md).
+For measured multi-GPU runs, see the [benchmark guide](./performance_benchmarks.md).
 
 1. (Optional) Create a docker image for Isaac Lab Workspace following the [docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html):
    ```sh
@@ -18,7 +18,7 @@ For measured multi-GPU runs, see the [Isaac Lab 2.3.2 performance benchmark guid
    docker push j3soon/runai-isaac-lab:3.0.0-beta2.patch1
    ```
 
-   Available Dockerfiles: [`Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`Dockerfile_2_3_2`](./Dockerfile_2_3_2), and [`Dockerfile_3_0_0_beta2_patch1`](./Dockerfile_3_0_0_beta2_patch1). The 3.0.0 beta image pins NVIDIA's `3.0.0-beta2-post1` image digest, which includes Isaac Sim 6.0.1 and the patch release fixes.
+   Available Dockerfiles: [`Dockerfile_2_1_0`](./Dockerfile_2_1_0), [`Dockerfile_2_2_0`](./Dockerfile_2_2_0), [`Dockerfile_2_3_2`](./Dockerfile_2_3_2), and [`Dockerfile_3_0_0_beta2_patch1`](./Dockerfile_3_0_0_beta2_patch1). The 3.0.0 beta image uses NVIDIA's versioned `3.0.0-beta2-post1` base image, which includes Isaac Sim 6.0.1 and the patch release fixes.
 
    > This step is optional since we provide pre-built docker images on Docker Hub.
 
@@ -46,7 +46,7 @@ For measured multi-GPU runs, see the [Isaac Lab 2.3.2 performance benchmark guid
    - Image
      - Image URL
        ```
-       j3soon/runai-isaac-lab:2.3.2
+       j3soon/runai-isaac-lab:2.2.0
        ```
      - Image pull policy
        ```
@@ -112,7 +112,12 @@ Basically, you'll want to store your modified Isaac Lab codebase under the `/mnt
 
 ## Distributed training on Run:ai
 
-Isaac Lab 2.3.2 supports multi-GPU and multi-node training on Linux for the RL-Games, RSL-RL, and skrl workflows. Each GPU runs a separate Isaac Lab process, so set `--nproc_per_node` to the number of GPUs allocated to each pod. See the Isaac Lab 2.3.2 [multi-GPU and multi-node training guide](https://isaac-sim.github.io/IsaacLab/v2.3.2/source/features/multi_gpu.html) for the commands for each supported workflow.
+Isaac Lab 2.2.0 supports multi-GPU and multi-node training on Linux for the RL-Games, RSL-RL, and skrl workflows. Each GPU runs a separate Isaac Lab process, so set `--nproc_per_node` to the number of GPUs allocated to each pod. See the Isaac Lab 2.2.0 [multi-GPU and multi-node training guide](https://isaac-sim.github.io/IsaacLab/v2.2.0/source/features/multi_gpu.html) for the commands for each supported workflow.
+
+Use 2.2.0 for distributed Camera workloads. The tested 2.3.2 image rejects
+nonzero local render devices; upstream [issue #5562](https://github.com/isaac-sim/IsaacLab/issues/5562)
+reports the same error. Non-Camera 2.3.2 workloads are unaffected by this
+specific limitation.
 
 For multi-GPU training within one Run:ai workspace, select a multi-GPU compute resource and update the environment command. For example, with `gpu-x2`:
 

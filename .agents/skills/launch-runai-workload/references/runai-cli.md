@@ -23,16 +23,16 @@ runai workload list --project <project> --no-pagination
 
 ## NFS mapping
 
-First inspect the installed CLI. Newer releases expose data-source assets directly:
+Do not use `--datasource` for now. On CLI `2.25`, a distributed submit copies `--nfs` into both `spec.storage` and `masterSpec.storage`, but copies `--datasource` into `spec.storage` only. The master pod then has no mount, writes to a non-existent path, and still exits `0`, so the output is lost silently. `--master-no-pvcs=false` does not fix it. Always mount with `--nfs`.
+
+Newer releases still list the assets, which is the supported way to resolve the approved mapping:
 
 ```bash
-runai datasource list --project <project> --type nfs --json
+runai datasource list --project <project> --type nfs
 runai datasource describe <name> --project <project> --type nfs --output json
 ```
 
-When the selected submit command supports `--datasource`, attach the approved asset by name using the exact format shown by its `--help` output. This preserves the administrator-managed mapping.
-
-The repository's tested CLI `2.23` does not expose `runai datasource` or a submit-time `--datasource` flag. On that version, a dashboard data-source name cannot be passed as the direct NFS specification. Resolve its actual server and export path, then use:
+Resolve the asset's actual server and export path at submit time rather than hard-coding them, so an administrator remapping the asset does not silently redirect writes. Then use:
 
 ```bash
 --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite"
@@ -113,6 +113,18 @@ runai training pytorch submit <name> \
 ```
 
 One worker plus the master creates two pods. Confirm whether the master participates in training for the selected image. If overriding commands, inspect `--master-command`, `--master-args`, and `--command` help rather than assuming one override applies identically to every pod.
+
+Mount with `--nfs`, never `--datasource`; see the NFS mapping section. Because a missing mount fails silently, assert it before the real command. Inside a `/run.sh "<cmd>" "<cmd>"` chain the guard must be a single bare command, because `/run.sh` runs each argument through unquoted `$1` word splitting and never re-parses `||`, `{`, or `;` as shell operators. `/run.sh` is `#!/bin/bash -ex`, so a nonzero exit aborts the chain:
+
+```bash
+/run.sh "mountpoint -q /mnt/nfs" "<real command>"
+```
+
+When overriding the entrypoint with an actual shell (`--command -- bash -c '...'`), the explicit form is available:
+
+```bash
+mountpoint -q /mnt/nfs || { echo "FATAL: /mnt/nfs is not a mount point"; exit 1; }
+```
 
 ## Persistent-storage probe
 

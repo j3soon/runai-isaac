@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Isaac Lab Benchmark"
+  short_description: "Reproduce Isaac Lab L40 benchmarks on Run:ai"
+  default_prompt: "Use $run-isaac-lab-benchmark to reproduce and verify the Isaac Lab L40 performance benchmark on Run:ai."
