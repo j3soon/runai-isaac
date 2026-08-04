@@ -114,7 +114,33 @@ Notes:
 - The container runs as root, so outputs are root-owned on the host. Reclaim them with `sudo chown -R "$(id -u):$(id -g)" artifacts/cosmos3`. Do not add `--user`: the virtual environment at `/workspace/.venv` is not readable by other users and the run fails immediately.
 - `--ipc=host` gives the container the host's shared memory. If your security policy disallows it, raise `--shm-size` instead.
 - `--seed=0` reproduces the same scene across runs, but not byte-identical files. Do not diff output bytes to check reproducibility.
+- Short free-text prompts suit larger checkpoints. `Cosmos3-Nano` rendered a four-element prompt as written, while `Cosmos3-Edge` dropped elements until upsampled. Add `--prompt-upsampling=True` for terse prompts, using the `=` form, since the space-separated form fails to parse on some checkpoints. It is a CLI override, not a sample-file key. A minimal custom sample is `{"name": ..., "model_mode": "text2image", "prompt": "..."}`.
+- Upsampling rewrites the prompt with the reasoner in memory. `sample_args.json` keeps only the original, so read the expanded caption from the run log if you need it.
 - Clean up with `docker rmi j3soon/runai-cosmos:3` (about 32GB) and by deleting the `models--nvidia--Cosmos3-*` directories under `~/.cache/huggingface/hub`.
+
+## Run On Run:ai
+
+Verified on a Run:ai cluster with the `prod` node pool, NVIDIA L40 (46GB), driver 580.105.08, CUDA 13.0.
+
+```sh
+export SSL_CERT_FILE=$HOME/.runai/certs/root-ca.crt
+runai training standard submit <name> \
+  --project <project> --node-pools prod \
+  --image j3soon/runai-cosmos:3 --image-pull-policy Always \
+  --gpu-devices-request 1 \
+  --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite" \
+  -e HF_HOME=/mnt/nfs/<user>/hf \
+  --command -- /run.sh "python -m cosmos_framework.scripts.inference --parallelism-preset=latency -i inputs/omni/i2v.json -o /mnt/nfs/<user>/cosmos3/i2v --checkpoint-path Cosmos3-Edge --seed=0"
+```
+
+Notes:
+
+- Resolve the NFS server and export with `runai datasource describe <asset> --project <project> --type nfs --output json` rather than hard-coding them.
+- Keep `HF_HOME` on the NFS mount. The first run downloads about 16GB of checkpoints there and later jobs reuse them; container-local caches are lost when the pod exits.
+- Add `-e HF_TOKEN=<token>` for gated repositories such as `Cosmos-Guardrail1`. It is readable through `runai workload describe`, so prefer a secret when the project is shared.
+- Do not nest double quotes inside `--command`; they are flattened before reaching the container and the command fails with a syntax error.
+- `Cosmos3-Edge` fits the 46GB L40. `Cosmos3-Nano` leaves little headroom for video on that GPU.
+- Verify outputs from a second workload. A pod can exit successfully with its output lost, and the run's `inputs/` entries are symlinks into a pod-local temp directory that does not survive.
 
 ## Storage And Environment Variables
 

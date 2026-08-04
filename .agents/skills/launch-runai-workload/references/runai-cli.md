@@ -4,6 +4,8 @@ These patterns target the repository's tested CLI 2.23 family. Run `runai versio
 
 Every Run:ai CLI submit command must include `--image-pull-policy Always`, including commands that use an immutable image digest. Verify this flag in the exact resolved command before executing it.
 
+Do not nest double quotes inside a `--command` argument. They are flattened before reaching the container, so `--command -- /run.sh "python -c \"import x\""` arrives as broken shell and the pod fails on a syntax error while still reporting a generic backoff-limit message. Use single quotes for the inner string, or keep the inner command quote-free. Check the resolved command in the `runai-submit-command` annotation of `runai ... describe` when a job fails immediately.
+
 Every GPU submit command must also include an explicit node pool; do not trust the CLI default. On this repository's configured cluster, pass `--node-pools prod` for user workloads. Node administration and the `dev` pool belong to the `admin-debug-runai-node` skill.
 
 ## Readiness
@@ -13,8 +15,28 @@ runai version
 runai config describe --json
 runai whoami
 runai project list --no-pagination
-runai workload list --project <project> --no-pagination
+runai workload list --project <project> --json
 ```
+
+`--no-pagination` returns a **single page**, not the full list; it is the flag that causes the trailing `next token`. Omit it to page through everything, and prefer `--json` when a complete inventory matters. A project can hold far more workloads than the first page shows.
+
+Deleting requires `-y` in a non-interactive shell, or the command aborts with `could not open a new TTY: open /dev/tty`. `runai workload delete -y -p <project> <name>...` accepts several names, but pass them as separate arguments; a single argument holding space-separated names fails with `no workload was found`. `runai workspace delete` has no `-y`, so use `runai workload delete` for both types. Deletion is irreversible and removes the pod logs, so confirm the resolved name list against `runai workload list` first.
+
+## Copying files off the cluster
+
+When FTP is unconfigured and the workstation has no NFS client or passwordless `sudo`, retrieve outputs through a short-lived workspace:
+
+```bash
+runai workspace submit <name> --project <project> --node-pools <pool> \
+  --image <image> --image-pull-policy Always \
+  --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite" \
+  --command -- /run.sh "python -m http.server 8000 --directory /mnt/nfs/<user>"
+runai workspace port-forward <name> --project <project> --port 8000:8000 &
+curl -s http://localhost:8000/<path> -o <local-path>
+runai workload delete -y -p <project> <name>
+```
+
+Verify the copy with `sha256sum` against a checksum taken in-cluster, and delete the workspace when finished. The mount is `readwrite`, so the same workspace can stage inputs onto the export.
 
 - If the cluster needs a VPN, connect it before diagnosing DNS or TLS.
 - For the repository's self-signed cluster, use its locally installed CA through `SSL_CERT_FILE`; never disable TLS verification for credential exchange.

@@ -33,6 +33,7 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - Dockerfiles should end with the standard `thirdparty/omnicli` and `scripts/docker/run.sh` copies plus `chmod` and CRLF guard (`sed -i 's/\r$//' /run.sh`); also set `ENV SHELL=/bin/bash`.
 - If a Dockerfile depends on a pinned upstream commit/tag/sha, keep that pin in the Dockerfile and do not document ad-hoc user overrides in app guides unless the repo explicitly supports/testing that workflow.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
+- This repository is public. Before writing an identifiable name into it (cluster, host, IP, project, or account), survey the existing usage first: `git grep -I -i -c '<term>' -- . ':!artifacts'`. Five or more existing uses means the term is already established and may be reused; fewer than five means ask the user before introducing it. Prefer placeholders (`<YOUR_LAB>`, `<NODE_NAME>`, `<YOUR_USERNAME>`, `<project>`) otherwise. Generic hardware and version facts are exempt.
 
 ## Adding Docker-Backed Applications
 - Before adding an application, inspect the closest existing Dockerfiles, application guides, image table, application index, and CI workflows. Follow the current repository conventions rather than copying a legacy file mechanically.
