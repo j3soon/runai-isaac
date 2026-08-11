@@ -20,6 +20,8 @@ runai workload list --project <project> --json
 
 `--no-pagination` returns a **single page**, not the full list; it is the flag that causes the trailing `next token`. Omit it to page through everything, and prefer `--json` when a complete inventory matters. A project can hold far more workloads than the first page shows.
 
+
+`global.update.auto: true` lets the CLI silently self-upgrade mid-session (observed 2.23.34 -> 2.25.27 within one session), so the command contract can change between two commands in the same shell. Re-check `--help` after any run that spans an upgrade.
 Deleting requires `-y` in a non-interactive shell, or the command aborts with `could not open a new TTY: open /dev/tty`. `runai workload delete -y -p <project> <name>...` accepts several names, but pass them as separate arguments; a single argument holding space-separated names fails with `no workload was found`. `runai workspace delete` has no `-y`, so use `runai workload delete` for both types. Deletion is irreversible and removes the pod logs, so confirm the resolved name list against `runai workload list` first.
 
 ## Copying files off the cluster

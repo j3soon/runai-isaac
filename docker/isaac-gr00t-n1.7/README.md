@@ -44,18 +44,13 @@ For the DROID embodiment the server expects `video.exterior_image_1_left` and `v
 
 > `state.eef_9d` is a position plus a 6D rotation. Passing zeros is degenerate and the server fails with `SVD did not converge` while orthonormalizing it, so send a valid rotation.
 
-Measured on a single RTX PRO 6000 Blackwell, using about **7GB** of VRAM. The image reports 14.7GB in `docker images` and 14GB from `docker image inspect`.
+For measured latency, VRAM, and the RoboLab loop figures, see the
+[performance guide](./performance.md).
 
-| Observation images | Mean | Min | Max |
-| --- | --- | --- | --- |
-| All zeros | 68-74ms | 61.7ms | 109.2ms |
-| Gradient | 81.5ms | 65.0ms | 119.5ms |
-| Random noise | 106.3ms | 69.3ms | 164.2ms |
+Two rules when measuring here:
 
-Two caveats before quoting these numbers:
-
-- **Let the GPU warm up first.** The first calls after the server reports ready are several times slower while clocks ramp from idle. Measured immediately after startup, random-noise calls averaged 266ms with an 825ms first call; the same workload settled to 106ms once warm. Discard at least the first ten calls.
-- **Image content changes the cost.** Synthetic all-zero frames are the cheapest case and understate real camera input by roughly 40%. Benchmark with representative frames rather than `np.zeros`.
+- **Let the GPU warm up.** The first calls after the server reports ready are several times slower while clocks ramp from idle. Discard at least the first ten calls.
+- **Image content changes the cost.** Synthetic all-zero frames are the cheapest case and understate real camera input substantially. Benchmark with representative frames rather than `np.zeros`.
 
 ## Evaluate With RoboLab
 
@@ -65,13 +60,13 @@ This image serves [RoboLab](../robolab/README.md)'s GR00T client. Start the serv
 docker run --rm --gpus all --network=host --ipc=host \
   -e OMNI_KIT_ACCEPT_EULA=Y -e ACCEPT_EULA=Y \
   -v "$(pwd)/artifacts/robolab/out:/workspace/robolab/output" \
-  --entrypoint bash j3soon/runai-robolab:0.2.1 -c \
+  --entrypoint bash j3soon/runai-robolab:0.3.0 -c \
   'cd /workspace/robolab && /workspace/isaaclab/_isaac_sim/python.sh -u policies/gr00t/run.py \
      --headless --task BananaInBowlTask --num-envs 1 \
      --remote-host 127.0.0.1 --remote-port 5555 --open-loop-horizon 8'
 ```
 
-Verified end to end: `BananaInBowlTask` succeeded with score 1.0 at episode step 175. RoboLab's own `timing` block reported **15.6ms** mean policy inference and **173.9ms** mean simulator step at 5.15 it/s, so the simulator, not the policy, is the bottleneck. `--open-loop-horizon 8` reuses each 40-step action chunk for 8 environment steps, which is why the per-step figure is far below the standalone latency above.
+Verified end to end: `BananaInBowlTask` completes successfully through this path. Read per-run figures from the `timing` block RoboLab writes into `episode_results.jsonl`; the simulator step, not policy inference, dominates. `--open-loop-horizon 8` reuses each 40-step action chunk across 8 environment steps, so the per-step inference cost is far below the standalone latency.
 
 > This works only because of the pin. The `n1.7-release` tag cannot serve this client at all; see the pin note near the top.
 

@@ -11,6 +11,8 @@ docker push j3soon/runai-isaac-gr00t:n1.6
 
 > `docker/isaac-gr00t-n1.6/Dockerfile` is adapted from the upstream [`docker/Dockerfile`](https://github.com/NVIDIA/Isaac-GR00T/tree/main/docker) for GR00T N1.6.
 
+> This image does **not** serve [RoboLab](../robolab/README.md)'s GR00T policy client, which targets GR00T **N1.7** (`nvidia/GR00T-N1.7-DROID`). Use the [Isaac GR00T N1.7](../isaac-gr00t-n1.7/README.md) image for that.
+
 > Environment command:
 >
 > ```

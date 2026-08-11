@@ -10,6 +10,13 @@ This repository is a documentation-and-assets workspace for running NVIDIA Isaac
 - `docs/`: User/developer documentation and screenshots (`docs/assets/`).
 - `thirdparty/omnicli/`: Bundled Omniverse CLI binaries used by `/run.sh`.
 - `.github/workflows/`: Per-image CI workflows for images built and published by this repository.
+- `.agents/skills/<name>/SKILL.md`: Repository task guides for agents (`add-runai-application`, `launch-runai-workload`, `run-isaac-lab-benchmark`, `admin-debug-runai-node`), with optional `references/` and `scripts/`.
+
+## Agent Skills and Durable Notes
+
+- A request to "use the skill" for a task refers to `.agents/skills/`, not to a harness feature. These are plain files: locate the task's `SKILL.md`, read it, and follow it alongside this document.
+- Development machines here are ephemeral. Record durable findings in the repository, not in an assistant's local memory: reusable pitfalls and their workarounds in `docs/developer-notes.md`, cluster/node failures in `troubleshooting.md`, image-specific behavior in that image's `docker/<name>/README.md`, and workflow changes in the relevant `SKILL.md`.
+- Keep such notes environment-agnostic. Use placeholders (`<YOUR_LAB>`, `<NODE_NAME>`, `<YOUR_USERNAME>`) rather than real hostnames, accounts, or tokens.
 
 ## Build, Test, and Development Commands
 - `docker build -t local/runai-pytorch-mnist -f docker/pytorch-mnist/Dockerfile .`: Build the example training image locally.
@@ -33,6 +40,7 @@ Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps
 - Dockerfiles should end with the standard `thirdparty/omnicli` and `scripts/docker/run.sh` copies plus `chmod` and CRLF guard (`sed -i 's/\r$//' /run.sh`); also set `ENV SHELL=/bin/bash`.
 - If a Dockerfile depends on a pinned upstream commit/tag/sha, keep that pin in the Dockerfile and do not document ad-hoc user overrides in app guides unless the repo explicitly supports/testing that workflow.
 - Keep scripts Unix-formatted (LF line endings) and executable when intended.
+- A pinned `uv.lock` does not necessarily cover every optional dependency group. Adding one to an existing `uv sync --locked` can fail with "the lockfile at `uv.lock` needs to be updated", which is a lockfile-coverage problem, not a dependency conflict — check `[tool.uv] conflicts` before assuming the latter. Follow whatever upstream's own documentation does for that group; when it syncs unlocked, add the group in a separate unlocked layer so the locked base environment is preserved, and record in a comment which packages the extra layer actually installs.
 - This repository is public. Before writing an identifiable name into it (cluster, host, IP, project, or account), survey the existing usage first: `git grep -I -i -c '<term>' -- . ':!artifacts'`. Five or more existing uses means the term is already established and may be reused; fewer than five means ask the user before introducing it. Prefer placeholders (`<YOUR_LAB>`, `<NODE_NAME>`, `<YOUR_USERNAME>`, `<project>`) otherwise. Generic hardware and version facts are exempt.
 
 ## Adding Docker-Backed Applications
@@ -50,6 +58,12 @@ There is no comprehensive automated test suite in this repo. Validate changes by
 - Running a syntax check for modified shell scripts (`bash -n`).
 - Performing a targeted manual smoke test for behavior changes (for example admin/vpn script flags).
 - For new applications, verify documentation commands against the built image and include reproducible local testing and cleanup steps when practical.
+
+Store run outputs and validation evidence under `artifacts/`, never in `/tmp`:
+
+- `/artifacts/` is gitignored, so evidence stays with the project and survives reboots without risking a commit. Note that a root-level `artifacts_*.zip` is **not** covered by that rule.
+- Follow the existing layout `artifacts/<app>/raw/evidence/<version>/<utc-timestamp>/` with lowercase timestamps (for example `20260804t133723z`), plus a short `README.md` recording hardware, image tag, and arguments.
+- Containers writing to a mounted host directory produce root-owned files. Reclaim them with a throwaway `docker run --rm -v "$PWD/artifacts/<app>:/out" <image> chown -R $(id -u):$(id -g) /out`; do not reach for `--user`, which breaks venv-based images.
 
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative commit subjects such as `Add ...`, `Update ...`, `Upgrade ...`, and `Change ...`. Follow that pattern and keep one logical change per commit.

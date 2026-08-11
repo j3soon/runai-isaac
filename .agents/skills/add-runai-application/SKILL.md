@@ -61,6 +61,8 @@ Build a complete application integration that follows the repository's current s
 
 ## 7. Validate and hand off
 
+- Read `references/validation-notes.md` first. It records pitfalls that have each produced a wrong conclusion before: black screen-capture video, buffered server readiness banners, token handling for gated checkpoints, and single-episode benchmark claims.
+
 - Build the exact Dockerfile from the repository root with its documented tag.
 - Run a targeted container smoke test that exercises the real entrypoint or documented command. For distributed images, test rendezvous and rank behavior with multiple containers when feasible.
 - Reproduce dependency-resolution failures outside Docker before rebuilding. Cloning upstream at the pinned commit and running the resolver's own check or dry-run isolates the cause in seconds, where each rebuild attempt costs many minutes.

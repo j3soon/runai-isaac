@@ -66,6 +66,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN echo "$CUDA_VERSION" | sed -E 's/^([0-9]+)\.([0-9]+).*/cu\1\2-train/' > /root/.cuda-name
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-editable --all-extras --group=$(cat /root/.cuda-name)
+
+# Add the RoboLab policy server (`filelock` + `openpi-server`), so this image can serve
+# `Cosmos3-{Nano,Edge}-Policy-DROID` to a RoboLab client. See `docker/robolab/README.md`.
+# Kept as a separate layer without `--locked`: the pinned `uv.lock` does not cover this group
+# combination, and `--locked` fails with "the lockfile at uv.lock needs to be updated". Upstream's
+# own `docs/action_policy_droid_server.md` also syncs this group unlocked. Verified to add exactly
+# two packages (`openpi-client==0.1.2`, `openpi-server==0.1.0`) with nothing removed or upgraded,
+# so the locked base environment above is preserved. `policy-server` is not declared conflicting
+# with the `cu*` groups, unlike `vllm`.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-install-project --no-editable --all-extras --group=$(cat /root/.cuda-name) --group=policy-server
 ENV PATH="/workspace/.venv/bin:$PATH"
 
 # Triton bundled ptxas doesn't support latest GPU architectures
