@@ -42,7 +42,25 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 
 > Skip this section if you're not using Brev.
 
-TODO
+Use Brev VM Mode when the host NVIDIA driver must be selected explicitly. For Isaac Lab 2.3.2 (Isaac Sim 5.1.0), the setup script installs Ubuntu's packaged NVIDIA 580 driver, downloads the pinned Compose file, enables the application as a systemd service, attempts `docker compose up -d`, and schedules a reboot.
+
+1. Create a Brev Launchable using **VM Mode**. Keep the default Brev software environment so Docker, Docker Compose, and NVIDIA Container Toolkit are available.
+1. Add the contents of [`brev_setup_2_3_2_ros2_jazzy.sh`](./brev_setup_2_3_2_ros2_jazzy.sh) as the VM setup script.
+1. Configure the ports or Secure Links you need from the Compose file: SSH `2222`, VNC `5900`, noVNC `6080`, VS Code `8080`, and JupyterLab `8888`.
+1. Deploy the Launchable. The setup script schedules a reboot approximately one minute after it completes. A warning from the initial Compose startup can be expected while the newly installed userspace driver and the still-loaded kernel module differ.
+1. Reconnect after the reboot and verify the driver and application:
+
+   ```sh
+   nvidia-smi
+   sudo systemctl status isaac-lab-ex-ros2.service
+   sudo docker compose \
+     --project-name isaac-lab-ex-ros2 \
+     -f /opt/isaac-lab-ex-ros2/compose.yaml \
+     -f /opt/isaac-lab-ex-ros2/compose.override.yaml \
+     ps
+   ```
+
+The systemd unit retries until the GPU driver is ready, while Compose's `restart: unless-stopped` policy keeps the container running across later Docker daemon and VM restarts. The host workspace is `/workspace`.
 
 ## Local
 
