@@ -75,18 +75,17 @@ mkdir -p ~/docker/isaac-sim/data/documents
 mkdir -p ~/docker/isaac-sim/data/Kit
 mkdir -p ~/docker/isaac-sim/logs
 mkdir -p ~/docker/isaac-sim/pkg
-sudo chown -R 1234:1234 ~/docker/isaac-sim
 
 xhost +local:docker
 docker run --rm -it --gpus all -e "ACCEPT_EULA=Y" \
   -p 12222:22 -p 15900:5900 -p 16080:6080 -p 18888:8888 -p 18080:8080 \
   -e "PRIVACY_CONSENT=Y" \
-  -v ~/docker/isaac-sim/cache/main:/isaac-sim/.cache:rw \
-  -v ~/docker/isaac-sim/cache/computecache:/isaac-sim/.nv/ComputeCache:rw \
-  -v ~/docker/isaac-sim/logs:/isaac-sim/.nvidia-omniverse/logs:rw \
-  -v ~/docker/isaac-sim/config:/isaac-sim/.nvidia-omniverse/config:rw \
-  -v ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw \
-  -v ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw \
+  -v ~/docker/isaac-sim/cache/main:/root/.cache:rw \
+  -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+  -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+  -v ~/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+  -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
+  -v ~/docker/isaac-sim/pkg:/root/.local/share/ov/pkg:rw \
   -v $(pwd):/app \
   j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy  # or :3.0.0-beta2-ros2-jazzy / :2.3.2-ros2-jazzy
 ```
@@ -95,6 +94,23 @@ You can also use the Docker Compose files:
 
 ```sh
 docker compose -f docker/isaac-lab-ex-ros2/compose_3_0_0_beta2_patch1_ros2_jazzy.yaml up
+
+# Isaac Lab 2.3.2, with optional host-port and workspace overrides
+VNC_PORT=15900 WORKSPACE_DIR="$PWD" \
+  docker compose -f docker/isaac-lab-ex-ros2/compose_2_3_2_ros2_jazzy.yaml up
+```
+
+In a noVNC terminal, launch Isaac Sim with its bundled Python 3.11 ROS 2 Jazzy libraries:
+
+```sh
+/root/isaacsim/isaac-sim.sh
+```
+
+For external ROS 2 CLI commands, open a separate terminal and explicitly activate the system Python 3.12 Jazzy environment:
+
+```sh
+use_ros2_jazzy
+ros2 topic list
 ```
 
 ## Developer Notes

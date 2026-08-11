@@ -5,21 +5,21 @@ services:
     restart: unless-stopped
     # Don't use `network_mode: host` here, as cloud environments may cause issues and cause `ros2 topic list` to hang.
     ports:
-      - "2222:22"
-      - "5900:5900"
-      - "6080:6080"
-      - "8080:8080"
-      - "8888:8888"
+      - "${SSH_PORT:-2222}:22"
+      - "${VNC_PORT:-5900}:5900"
+      - "${NOVNC_PORT:-6080}:6080"
+      - "${CODE_SERVER_PORT:-8080}:8080"
+      - "${JUPYTER_PORT:-8888}:8888"
     volumes:
-      # Isaac Sim cache
-      - ~/docker/isaac-sim/cache/main:/isaac-sim/.cache:rw
-      - ~/docker/isaac-sim/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
-      - ~/docker/isaac-sim/logs:/isaac-sim/.nvidia-omniverse/logs:rw
-      - ~/docker/isaac-sim/config:/isaac-sim/.nvidia-omniverse/config:rw
-      - ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw
-      - ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw
+      # This binary-based image runs as root, so persist its actual home paths.
+      - ~/docker/isaac-sim/cache/main:/root/.cache:rw
+      - ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/pkg:/root/.local/share/ov/pkg:rw
       # Workspace
-      - /workspace:/workspace
+      - "${WORKSPACE_DIR:-../..}:/workspace"
     deploy:
       resources:
         reservations:

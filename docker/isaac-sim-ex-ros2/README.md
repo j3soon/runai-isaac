@@ -97,18 +97,17 @@ mkdir -p ~/docker/isaac-sim/data/documents
 mkdir -p ~/docker/isaac-sim/data/Kit
 mkdir -p ~/docker/isaac-sim/logs
 mkdir -p ~/docker/isaac-sim/pkg
-sudo chown -R 1234:1234 ~/docker/isaac-sim
 
 xhost +local:docker
 docker run --rm -it --gpus all -e "ACCEPT_EULA=Y" \
   -p 12222:22 -p 15900:5900 -p 16080:6080 -p 18888:8888 -p 18080:8080 \
   -e "PRIVACY_CONSENT=Y" \
-  -v ~/docker/isaac-sim/cache/main:/isaac-sim/.cache:rw \
-  -v ~/docker/isaac-sim/cache/computecache:/isaac-sim/.nv/ComputeCache:rw \
-  -v ~/docker/isaac-sim/logs:/isaac-sim/.nvidia-omniverse/logs:rw \
-  -v ~/docker/isaac-sim/config:/isaac-sim/.nvidia-omniverse/config:rw \
-  -v ~/docker/isaac-sim/data:/isaac-sim/.local/share/ov/data:rw \
-  -v ~/docker/isaac-sim/pkg:/isaac-sim/.local/share/ov/pkg:rw \
+  -v ~/docker/isaac-sim/cache/main:/root/.cache:rw \
+  -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+  -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+  -v ~/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+  -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
+  -v ~/docker/isaac-sim/pkg:/root/.local/share/ov/pkg:rw \
   -v $(pwd):/app \
   j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy  # or :6.0.0-ros2-jazzy / :5.1.0-ros2-jazzy
 ```
