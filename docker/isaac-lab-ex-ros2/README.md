@@ -109,7 +109,8 @@ In a noVNC terminal, launch Isaac Sim with its bundled Python 3.11 ROS 2 Jazzy l
 For external ROS 2 CLI commands, open a separate terminal and explicitly activate the system Python 3.12 Jazzy environment:
 
 ```sh
-use_ros2_jazzy
+source /opt/ros/jazzy/setup.bash
+source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
 ros2 topic list
 ```
 
@@ -118,3 +119,5 @@ ros2 topic list
 We intentionally install Isaac Sim via binary instead of pip, since the accompanied source code and example code can greatly help AI agents to write new code.
 
 Isaac Lab is cloned from source and installed via `isaaclab.sh --install`, so the full codebase is available at `/root/IsaacLab` inside the container.
+
+For the 2.3.2 image, `isaacsim_ml_archive.pth` is required. Isaac Sim 5.1 does not put `exts/omni.isaac.ml_archive/pip_prebundle` on embedded Python's initial `sys.path`, although Torch and its bundled CUDA libraries are stored there. Python processes the `.pth` file during site initialization, before Kit extensions import Torch. In a clean A/B build, removing it produced 203 Kit errors and 104 tracebacks, including 141 reports that `libcublas` could not be found; restoring it reduced all three counts to zero and allowed the ROS bridge and `rclpy` to load.
