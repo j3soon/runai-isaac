@@ -36,7 +36,32 @@ curl -s http://localhost:8000/<path> -o <local-path>
 runai workload delete -y -p <project> <name>
 ```
 
-Verify the copy with `sha256sum` against a checksum taken in-cluster, and delete the workspace when finished. The mount is `readwrite`, so the same workspace can stage inputs onto the export.
+Verify the copy with `sha256sum` against a checksum taken in-cluster, and delete the workspace when finished.
+
+## Copying files onto the cluster
+
+The repository's documented upload path is FTP (root `README.md`). When the cluster's FTP credentials are unprovisioned — `secrets/env.sh` still holding `<FTP_USER>` / `<FTP_PASS>` — and the workstation has no NFS client or passwordless `sudo`, two obvious substitutes do not work:
+
+- `runai ... exec --stdin` cannot stream binary data. It fails with `Error: failed to exec output. inappropriate ioctl for device` while the `runai` process exits `0`, so a `tar | runai exec -i` pipeline reports success and leaves a 0-byte file.
+- `python -m http.server` serves `GET` only, so the download workspace above cannot accept an upload.
+
+What works is a small `PUT`/`GET` endpoint in the staging workspace, reached through the same `port-forward`. Stage the script rather than inlining it, per the command-validation guard above: `base64` it locally, decode it in the pod, and hash-check it before running.
+
+```bash
+B64=$(base64 -w0 upload_server.py); SHA=$(sha256sum upload_server.py | cut -d' ' -f1)
+runai workspace exec <name> --project <project> -- \
+  bash -lc "echo '$B64' | base64 -d > /tmp/upload_server.py; echo '$SHA  /tmp/upload_server.py' | sha256sum --check"
+runai workspace exec <name> --project <project> -- \
+  bash -lc "nohup <python> /tmp/upload_server.py /mnt/nfs/<username> <token> 8000 > /tmp/upload_server.log 2>&1 &"
+runai workspace port-forward <name> --project <project> --port 8000:8000 &
+curl -f -T bundle.tgz "http://localhost:8000/<token>/<subdir>/bundle.tgz"
+```
+
+Require a random token prefix in the request path: the pod network is shared, so an unauthenticated writer bound to `0.0.0.0` would let any pod write into the NFS user directory. Verify the upload with `sha256sum --check` **in the pod** before extracting, and delete the workspace when finished.
+
+Do not assume `python3` is on `PATH`. Simulator images often ship their interpreter elsewhere (for the Isaac Lab image it is `/isaac-sim/kit/python/bin/python3`); resolve it before starting the endpoint.
+
+The mount is `readwrite`, so one workspace covers both directions: stage inputs, run the real workloads, then pull the outputs back through the same endpoint.
 
 - If the cluster needs a VPN, connect it before diagnosing DNS or TLS.
 - For the repository's self-signed cluster, use its locally installed CA through `SSL_CERT_FILE`; never disable TLS verification for credential exchange.
@@ -177,6 +202,28 @@ Use the matching `workspace` or `training pytorch` subcommand for logs/exec/dele
 While a workload is pending, inspect events for quota, placement, PVC/NFS, image pull, admission, or policy errors. While it is running, inspect application logs and GPU/process state. After completion, record the exit state before cleanup.
 
 Prefer `runai ... exec` or `runai ... bash` over node SSH. Use SSH only through an explicitly exposed, authorized workspace service; never assume cluster-node SSH access.
+
+### `exec` is not a synchronous shell
+
+Three separate behaviours, each of which makes a failed remote step look like a successful one:
+
+- **It returns before the in-pod command finishes.** A `wc -l` issued straight after an extract reports `0` while the extract is still writing.
+- **It sometimes swallows stdout entirely** while the command still runs to completion. An echoed `BUILD_OK` is therefore not a success signal, and its absence is not a failure signal.
+- **It truncates long `&&` chains.** A chain of `rm marker && extract && cp -r && tar && mv && write marker` executed the `rm` and stopped, leaving no marker, no output, and no error.
+
+Run remote work as several short `exec` calls, have the last one write a marker file to the mount, and poll for that marker. Verify by file state, never by `exec`'s return value or output. `runai ... exec --stdin` additionally cannot stream binary — see "Copying files onto the cluster".
+
+### Never read a file that is being written
+
+Downloading an export while the pod regenerated it returned **0 bytes** on three separate cycles, and `tar` of a live log file failed with `file changed as we read it` while leaving the *previous* archive in place, which downloads as a plausible but stale file.
+
+Build to `*.tmp` and `mv` into place (atomic within one filesystem), snapshot directories with `cp -r` to `/tmp` before archiving, and assert the artifact **grew** against the previous copy before trusting it. That growth assertion is what catches a stale pull; every individual command reports success. Note `cp -a` fails on some NFS mounts (`preserving permissions: Operation not supported`) — use `cp -r`.
+
+### Session lifetimes during long runs
+
+Workloads outlive the things you watch them with. Over a multi-day run: `port-forward` dies after roughly 55 minutes (the endpoint stops answering while the process still looks alive), the auth token expires and its SSO re-login is **interactive**, a VPN drop makes `workload list` return empty and DNS fail — check the tunnel before concluding the jobs died — and a staging workspace ends whenever its `sleep` does, so give it `sleep 86400` rather than `sleep 3600`.
+
+Logs survive completion: `runai ... logs` still serves a `Completed` workload's output, which is lost only on `runai workload delete`.
 
 ## Cleanup
 

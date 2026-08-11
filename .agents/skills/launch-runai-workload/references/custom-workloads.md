@@ -62,6 +62,14 @@ Try to reproduce a custom workload locally before its first Run:ai submission. A
 
 The repository's standard `/run.sh` and Omniverse helpers are required for repository-supported images, not for every independent user image. A custom image may use `/bin/bash -lc`, an exec-form entrypoint, or its native launcher when that is the tested contract.
 
+## Container environment surprises
+
+These are properties of the Run:ai pod, not of the image, and they bite after the image pull and application startup are already paid for.
+
+- **`HOME` is `/root` regardless of the image's user.** Every submitted pod gets it, even when the image declares a non-root `USER` with a different home; measured on both `ubuntu:24.04` (`uid=0`) and a `uid=1000` image. Whether that matters depends on the image — one that chowns `/root` to that uid writes there fine, one that leaves it root-owned fails for any application caching under `$HOME` (Omniverse Kit and Isaac Sim do). Settle it in under a minute with `--command -- bash -lc 'id; echo HOME=$HOME; ls -ld $HOME; touch $HOME/.probe'`, then pass `-e HOME=<writable path>` plus a `mkdir` in the same chain, or use `--create-home-dir`.
+- **A path hard-coded inside the image can be satisfied by a second `--nfs`.** When code resolves an absolute path such as `/home/<user>/<project>/...`, a non-root container cannot create it (`mkdir: cannot create directory: Permission denied`), and neither a symlink nor an in-container `mkdir` is available. Mount the staged sub-directory straight onto it: `--nfs "server=<SERVER>,path=<EXPORT>/<YOUR_USERNAME>/<project>,mountpath=/home/<user>/<project>,readwrite"`. The server serves sub-paths of the export and the kubelet creates the mount point as root before the container starts, so the code runs unmodified instead of being patched per cluster. Keep the ordinary `/mnt/nfs` mount alongside it, and check `describe --events` in the first minute — a refused sub-path leaves the pod in `ContainerCreating` with `FailedMount` rather than failing loudly.
+- **A large image's first pull dominates startup.** The 16GB `j3soon/runai-isaac-lab` image took about 14 minutes from the `Pulling` event to the first application log on a node without it, against 13 seconds on a node with it cached. A workload sitting in `Initializing` for ten-plus minutes is expected on a cold node; confirm with the `Pulling`/`Pulled` events before investigating scheduling.
+
 ## Local validation matrix
 
 Run the strongest available checks:
