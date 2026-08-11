@@ -1,0 +1,163 @@
+# Ref: https://github.com/isaac-sim/IsaacLab-Arena/blob/8b4a3a47fc53de23e8205089d71109a2e2348acd/docker/Dockerfile.isaaclab_arena
+# Copyright (c) 2025-2026, The Isaac Lab Arena Project Developers (https://github.com/isaac-sim/IsaacLab-Arena/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Isaac Lab Arena publishes no Git tags; `release/0.2.1` is the release line the upstream docs
+# recommend as stable. The commit above is the `release/0.2.1` head at the time of writing.
+#
+# The upstream Dockerfile copies a local checkout, including the `submodules/IsaacLab` and
+# `submodules/Isaac-GR00T` Git submodules, which are unavailable when building from this
+# repository root. This is a self-contained variant that clones the upstream repository and
+# its submodules at their pinned commits instead.
+
+ARG BASE_IMAGE=nvcr.io/nvidia/isaac-sim:6.0.0-dev2
+
+FROM ${BASE_IMAGE}
+
+LABEL org.opencontainers.image.version="0.2.1"
+
+USER root
+
+ARG WORKDIR="/workspace"
+ENV WORKDIR=${WORKDIR}
+WORKDIR "${WORKDIR}"
+
+# Hide conflicting Vulkan files, if needed.
+RUN if [ -e "/usr/share/vulkan" ] && [ -e "/etc/vulkan" ]; then \
+      mv /usr/share/vulkan /usr/share/vulkan_hidden; \
+    fi
+
+# Install apt packages
+RUN apt-get update && apt-get install -y \
+  git \
+  git-lfs \
+  cmake \
+  sudo \
+  jq \
+  ffmpeg \
+  python3-pip
+
+################################
+# Clone Isaac Lab Arena
+################################
+# Local fix: replaces the upstream `COPY ./submodules/IsaacLab ...` / `COPY isaaclab_arena ...`
+# instructions, which require a local checkout. The submodule commits come from the pinned
+# Arena commit, so the resulting tree matches an upstream checkout at that revision.
+# The upstream submodule URLs are SSH, so rewrite them to HTTPS for an unauthenticated build.
+# Submodules are initialized non-recursively: the only nested submodules are Isaac-GR00T's
+# `external_dependencies/*` simulation benchmarks, which the remote policy client does not use.
+ARG ISAACLAB_ARENA_REPO=https://github.com/isaac-sim/IsaacLab-Arena.git
+ARG ISAACLAB_ARENA_REF=8b4a3a47fc53de23e8205089d71109a2e2348acd
+RUN git config --global url."https://github.com/".insteadOf "git@github.com:" && \
+    git clone ${ISAACLAB_ARENA_REPO} ${WORKDIR} && \
+    git -C ${WORKDIR} checkout ${ISAACLAB_ARENA_REF} && \
+    git -C ${WORKDIR} submodule update --init
+
+################################
+# Install Isaac Lab
+################################
+# Set the ISAACLAB_PATH environment variable
+ENV ISAACLAB_PATH=${WORKDIR}/submodules/IsaacLab
+ENV TERM=xterm
+# Symlink isaac sim to IsaacLab
+RUN ln -s /isaac-sim/ ${WORKDIR}/submodules/IsaacLab/_isaac_sim
+# Install IsaacLab dependencies
+RUN for DIR in ${WORKDIR}/submodules/IsaacLab/source/isaaclab*/; do /isaac-sim/python.sh -m pip install --no-deps -e "$DIR"; done
+# Logs and other stuff appear under dist-packages per default, so this dir has to be writeable.
+RUN chmod 777 -R /isaac-sim/kit/
+# Make /isaac-sim directory traversable and readable by all users
+# This is needed when the workload runs as a non-root user
+RUN chmod a+x /isaac-sim
+# Ensure isaaclab_visualizers is installed so --visualizer kit works.
+RUN /isaac-sim/python.sh -m pip install --no-deps -e ${WORKDIR}/submodules/IsaacLab/source/isaaclab_visualizers
+RUN /isaac-sim/python.sh -m pip install --no-deps -e ${WORKDIR}/submodules/IsaacLab/source/isaaclab_teleop
+
+# Install isaaclab
+RUN ${ISAACLAB_PATH}/isaaclab.sh -i
+
+# Install Isaac Teleop Python APIs (retargeters, device I/O, OpenXR bindings)
+RUN /isaac-sim/python.sh -m pip install isaacteleop~=1.1.0 --extra-index-url https://pypi.nvidia.com
+
+# Install isaaclab_newton's [all] extra so its pinned mujoco / mujoco-warp / newton
+# versions take effect. The earlier `isaaclab*` loop above and `isaaclab.sh -i`
+# install with `--no-deps` and without the extra, so the pins in
+# `isaaclab_newton/setup.py::EXTRAS_REQUIRE["all"]` are otherwise ignored,
+# and `isaaclab` pulls `mujoco-warp>=3.5` which resolves to 3.7.x — where
+# `geom_dataid` is 2D and breaks the pinned Newton's SolverMuJoCo kernels.
+RUN /isaac-sim/python.sh -m pip install -e \
+      "${WORKDIR}/submodules/IsaacLab/source/isaaclab_newton[all]"
+
+# Upgrade pip ahead of the editable install
+RUN /isaac-sim/python.sh -m pip install --upgrade pip
+
+# PyAV: video read/write backend used by isaaclab_arena_gr00t/lerobot/convert_hdf5_to_lerobot.py
+RUN /isaac-sim/python.sh -m pip install av
+
+# Lightwheel server
+ENV LW_API_ENDPOINT="https://api-dev.lightwheel.net"
+
+# HuggingFace CLI for downloading datasets and models.
+# Use pipx so the hf binary gets an isolated venv with all its deps (e.g. requests),
+# without touching system Python packages.
+RUN apt-get update && apt-get install -y pipx && \
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin \
+    pipx install \
+    "huggingface-hub[cli]" \
+    pre-commit
+
+################################
+# Install GR00T policy client  #
+################################
+# Local fix: the upstream `INSTALL_GROOT` build argument (CUDA 12.8 + flash-attn + the full
+# GR00T N1.6 runtime) is dropped here, matching the upstream default of `INSTALL_GROOT=false`.
+# The lightweight remote PolicyClient (gr00t.policy.server_client) is still installed, so GR00T
+# evaluation works against a policy server running in a separate workload.
+RUN /isaac-sim/python.sh -m pip install msgpack==1.1.0 msgpack-numpy==0.4.8 pyzmq==27.0.1 && \
+    /isaac-sim/python.sh -m pip install --no-deps --ignore-requires-python -e ${WORKDIR}/submodules/Isaac-GR00T/
+
+# Install IsaacLab Arena (runtime + dev deps declared in setup.py)
+RUN /isaac-sim/python.sh -m pip install -e "${WORKDIR}/[dev]"
+
+# Set an alias to run the isaac lab python interpreter.
+RUN echo "alias python='/isaac-sim/python.sh'" >> /etc/bash.bashrc
+RUN echo "alias pip3='/isaac-sim/python.sh -m pip'" >> /etc/bash.bashrc
+RUN echo "alias pytest='/isaac-sim/python.sh -m pytest'" >> /etc/bash.bashrc
+
+# Change prompt so it's obvious we're inside the arena container
+RUN echo "PS1='[IsaacLab Arena] \[\e[0;32m\]~\u \[\e[0;34m\]\w\[\e[0m\] \$ '" >> /etc/bash.bashrc
+# List files as a table, with colors, show hidden, append indicators (/ for dirs, * for executables, @ for symlinks)
+RUN echo "alias ll='ls -alF --color=auto'" >> /etc/bash.bashrc
+# Go one level up
+RUN echo "alias ..='cd ..'" >> /etc/bash.bashrc
+# Change prompt to colored one for root too
+RUN cp /etc/bash.bashrc /root/.bashrc
+
+# Local fix: the upstream `ENTRYPOINT ["/entrypoint.sh"]` creates a container user from the
+# `DOCKER_RUN_USER_ID` / `DOCKER_RUN_GROUP_ID` variables that `docker/run_docker.sh` passes, and
+# aborts under `set -u` when they are unset. Run:ai does not set them, so the entrypoint is
+# dropped and the repository's `/run.sh` wrapper is used as the workload command instead.
+# The `_isaac_sim` symlink and `ldconfig` that entrypoint also handled are applied at build time.
+RUN ldconfig
+
+ENV ACCEPT_EULA=Y
+ENV PRIVACY_CONSENT=Y
+ENV OMNI_KIT_ACCEPT_EULA=YES
+ENV SHELL=/bin/bash
+
+# Tools and scripts for Omniverse
+COPY thirdparty/omnicli /omnicli
+COPY scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
+
+# The base image entrypoint is `/isaac-sim/runheadless.sh`, which would consume the workload
+# command as its own arguments. Clear it so the Run:ai command (`/run.sh "..."`) and local
+# `docker run` commands are executed directly, as the upstream entrypoint also replaced it.
+ENTRYPOINT []
+
+CMD ["/bin/bash"]

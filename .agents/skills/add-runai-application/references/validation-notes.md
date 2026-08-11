@@ -21,6 +21,16 @@ or a PipeWire portal grabber) rather than `x11grab`.
 Verify recordings by content, not exit code. A blank clip is a few KB while a real scene is
 hundreds of KB or more; `ffprobe` for frame count plus an extracted frame settles it in seconds.
 
+That check matters most where the recorder fails silently. On Isaac Lab 3.x, `--video` alone is not
+enough and has two distinct failure modes. Without `--enable_cameras` the run aborts on the first
+step with `ModuleNotFoundError: No module named 'omni.replicator'`, which is at least loud. With
+`--enable_cameras` but no visualizer backend, the run exits 0 and writes a structurally valid MP4
+containing only an empty viewport — an all-black first frame followed by a uniform light-gray
+background. Isaac Lab 3.x populates a viewport only when a `--visualizer` / `--viz` backend is
+active, and `env.render()` captures that viewport, so cameras alone load the render extensions with
+nothing to capture. Pass `--enable_cameras --viz kit` together. `--headless` is deprecated in this
+release; headless is the default when no `--viz` backend is requested.
+
 ## A buffered policy server looks hung
 
 Python buffers stdout when it is not a TTY, which hides *readiness banners*. A policy server such
@@ -49,6 +59,23 @@ Gated model downloads need credentials, and batch workloads cannot log in intera
   checkpoints are public and need no token at all, and assuming otherwise invents a blocker.
 - A warm cache does not substitute for a token when the loader resolves the repo through the Hub
   API. `HF_HUB_OFFLINE=1` turns that into a hard failure rather than a cache hit.
+- Distinguish "gated" from "does not exist". `401` unauthenticated together with `404`
+  *authenticated* means the repository is absent, not gated; a genuinely gated repo returns
+  metadata with `"gated": "auto"|"manual"` once authenticated. Confirm with
+  `https://huggingface.co/api/models?author=<org>&search=<term>` to catch renames.
+
+## A documented checkpoint may never have been published
+
+Upstream docs advertise pre-trained artifacts that do not exist, especially in early releases.
+Isaac Lab Arena 0.2.1's evaluation guide documents
+`hf download nvidia/Arena-Franka-Lift-Object-RL-Task`; that repository 404s even with a valid
+token, so training locally is the only route to that checkpoint.
+
+Run the existence precheck *before* abandoning a working fallback. Killing a training run to switch
+to a checkpoint that turns out not to exist wastes the run and leaves nothing to show. When a long
+run is interrupted, what survives is decided by the framework's save interval — RSL-RL's
+`agent.save_interval` defaults to 200 iterations — not by where you stopped, so check that interval
+before relying on an early stop.
 
 ## Do not quote a benchmark from one episode
 
