@@ -87,10 +87,19 @@ For multi-node evaluation, follow the same Run:ai **Distributed** PyTorch **Trai
 
 ### Train An RSL-RL Policy, Then Evaluate It
 
-`--policy_type rsl_rl` needs a checkpoint produced by Isaac Lab's `train.py`, together with the
-`params/agent.yaml` written beside it. The upstream evaluation guide advertises a pre-trained
-checkpoint at `hf download nvidia/Arena-Franka-Lift-Object-RL-Task`, but that repository returns
-HTTP 404 even when authenticated, so as of Arena 0.2.1 the checkpoint must be trained locally.
+`--policy_type rsl_rl` needs a checkpoint plus the `params/agent.yaml` written beside it. Either
+download a pre-trained one or produce it with Isaac Lab's `train.py`.
+
+The pre-trained checkpoint is public and needs no token:
+
+```sh
+hf download nvidia/Arena-Franka-Lift-Object-RL-Task --local-dir /models/lift_object_checkpoint
+```
+
+It ships `model_1999.pt` and `model_1000.pt` alongside `params/agent.yaml`, which is the layout the
+policy expects. `nvidia/Arena-Dexsuite-Lift-RL-Newton-Task` covers the DexSuite task. Both were
+absent when this guide was first written and were published on 2026-08-10 in response to
+[IsaacLab-Arena#904](https://github.com/isaac-sim/IsaacLab-Arena/issues/904).
 
 Training uses Isaac Lab's RSL-RL script with an Arena callback that registers the Arena environment
 under the `--task` name. Mount a persistent directory at `/workspace/logs`, since checkpoints are
@@ -125,10 +134,32 @@ Unlike `zero_action`, this reports a real `success_rate`; see the
 
 Arena 0.2.1 targets GR00T **N1.6**, not N1.7: its configs under `isaaclab_arena_gr00t/policy/config/` use `embodiment_tag: GR1` and expect a finetuned checkpoint on disk (for example `/models/isaaclab_arena/static_manipulation_tutorial/checkpoint-20000`). NVIDIA publishes matching Arena-tuned checkpoints — `nvidia/GN16-Tuned-Arena-GR1-Manipulation`, `nvidia/GN1.6-Tuned-Arena-GR1-PlaceItemCloseDoor-Task`, and `nvidia/GN1x-Tuned-Arena-G1-Static-PickNPlace` are public and need no token.
 
-Two ways to run one, neither yet exercised in this repository:
+Download the checkpoint. Only inference files are needed — the full repository is 50.6GB, mostly
+training state:
 
-- **Remote.** Serve the policy from a separate workload built on the [Isaac GR00T N1.6 image](../isaac-gr00t-n1.6/README.md) and point Arena's client at it with `--policy_type gr00t_remote_closedloop --remote_host <host> --remote_port 5555`. This image already ships the client side (`pyzmq`, `msgpack`), so it needs no rebuild.
-- **Local.** `isaaclab_arena_environments/eval_jobs_configs/gr00t_jobs_config.json` uses `Gr00tClosedloopPolicy`, which loads the checkpoint in-process. That needs a rebuild with `INSTALL_GROOT=true`, since this image ships the `gr00t` package without `flash_attn`, `peft`, `diffusers`, or `accelerate`. Check your GPU's compute capability first: the GR00T dependency script installs CUDA 12.8, whose flash-attn wheels do not cover newer architectures such as sm_120.
+```sh
+hf download nvidia/GN1x-Tuned-Arena-GR1-Manipulation --revision gn1_6 \
+  --local-dir /models/isaaclab_arena/static_manipulation_tutorial/checkpoint-20000 \
+  --exclude "global_step20000/*" "optimizer.pt"
+```
+
+That path must match `model_path` in the policy YAML. Then either:
+
+- **Local (verified).** `gr00t_jobs_config.json` uses `Gr00tClosedloopPolicy`, which loads the checkpoint in-process. This image ships the `gr00t` package without `flash_attn`, `peft`, `diffusers`, or `accelerate`; upstream's `docker/setup/install_gr00t_deps.sh` adds them under `/opt/groot_deps`. Run with `PYTHONPATH=$PYTHONPATH:/opt/groot_deps`:
+
+  ```sh
+  /isaac-sim/python.sh -u /workspace/isaaclab_arena/evaluation/policy_runner.py \
+      --policy_type isaaclab_arena_gr00t.policy.gr00t_closedloop_policy.Gr00tClosedloopPolicy \
+      --policy_config_yaml_path isaaclab_arena_gr00t/policy/config/gr1_manip_gr00t_closedloop_config.yaml \
+      --policy_device cuda:0 --enable_cameras --num_steps 60 \
+      gr1_open_microwave --object cracker_box --embodiment gr1_joint
+  ```
+
+  Two things this fails on otherwise. **`--enable_cameras` is mandatory** — GR00T is a vision policy, and without it the checkpoint loads, the rollout starts, and the first step dies with `camera_obs is not in observation`. And **remove DeepSpeed** (`rm -rf /opt/groot_deps/deepspeed*`) unless you also ran upstream's `install_cuda.sh`: `transformers` auto-detects it and it aborts the import with `CUDA_HOME does not exist, unable to compile CUDA op(s)`. DeepSpeed is only needed for training.
+
+  flash-attn comes from a prebuilt `cu128torch2.10-cp312` wheel matching this image's torch, and it runs on Blackwell — `sm_120` is in `torch.cuda.get_arch_list()` and a bf16 `flash_attn_func` forward returns finite output on an RTX PRO 6000 (cc 12.0).
+
+- **Remote (not yet exercised).** Serve the policy from a separate workload built on the [Isaac GR00T N1.6 image](../isaac-gr00t-n1.6/README.md) and point Arena's client at it with `--policy_type gr00t_remote_closedloop --remote_host <host> --remote_port 5555`. This image already ships the client side (`pyzmq`, `msgpack`), so it needs no rebuild.
 
 ## Run Locally
 

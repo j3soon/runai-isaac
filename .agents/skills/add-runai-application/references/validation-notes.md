@@ -64,12 +64,18 @@ Gated model downloads need credentials, and batch workloads cannot log in intera
   metadata with `"gated": "auto"|"manual"` once authenticated. Confirm with
   `https://huggingface.co/api/models?author=<org>&search=<term>` to catch renames.
 
-## A documented checkpoint may never have been published
+## A documented checkpoint may not be published yet
 
-Upstream docs advertise pre-trained artifacts that do not exist, especially in early releases.
-Isaac Lab Arena 0.2.1's evaluation guide documents
-`hf download nvidia/Arena-Franka-Lift-Object-RL-Task`; that repository 404s even with a valid
-token, so training locally is the only route to that checkpoint.
+Upstream docs get written against artifacts that are not public yet, especially in early releases.
+Isaac Lab Arena 0.2.1's evaluation guide documented
+`hf download nvidia/Arena-Franka-Lift-Object-RL-Task` while that repository still 404'd with a
+valid token; it was published a week later, after
+[IsaacLab-Arena#904](https://github.com/isaac-sim/IsaacLab-Arena/issues/904) reported the gap.
+
+So treat a missing artifact as a point-in-time fact, not a permanent one. Record the date you
+checked, prefer a workaround that does not depend on it, and re-check before repeating the claim —
+a note saying a checkpoint "does not exist" silently rots into misinformation. Searching the issue
+tracker for the artifact name costs nothing and often finds either a fix or a rename.
 
 Run the existence precheck *before* abandoning a working fallback. Killing a training run to switch
 to a checkpoint that turns out not to exist wastes the run and leaves nothing to show. When a long

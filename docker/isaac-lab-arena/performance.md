@@ -45,6 +45,21 @@ than one episode, so nothing terminates and no success can be recorded.
 The arm grasps the cube and lifts it to the goal marker on one of two attempts. Train the full
 2000 iterations for a policy that succeeds consistently.
 
+## GR00T N1.6 closed-loop policy
+
+`Gr00tClosedloopPolicy` with the `gn1_6` revision of `nvidia/GN1x-Tuned-Arena-GR1-Manipulation`, on
+`gr1_open_microwave` with `--enable_cameras`, one environment:
+
+| Metric | Value |
+| --- | --- |
+| Checkpoint load | about 4.5s for 2 safetensors shards |
+| Rollout | 60 steps in 6s, **9.43 step/s** |
+| Peak VRAM | about 11.1GB for simulator, cameras, and the 2B VLA together |
+| Checkpoint on disk | 6.57GB inference-only, of a 50.6GB repository |
+
+No `success_rate` is reported for a 60-step run: an episode is longer than that, so nothing
+terminates. Use `--num_episodes` for task performance.
+
 ## RSL-RL training
 
 Isaac Lab's RSL-RL script with the Arena registration callback, `lift_object`, 4096 environments:
