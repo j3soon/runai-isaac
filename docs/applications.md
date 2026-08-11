@@ -17,6 +17,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 - [Isaac GR00T N1](../docker/isaac-gr00t-n1/README.md)
 - [Isaac GR00T N1.5](../docker/isaac-gr00t-n1.5/README.md)
 - [Isaac GR00T N1.6](../docker/isaac-gr00t-n1.6/README.md)
+- [Isaac GR00T N1.7](../docker/isaac-gr00t-n1.7/README.md)
 - [LeRobot GPU](../docker/lerobot-gpu/README.md)
 - [Cosmos-Predict1](../docker/cosmos-predict1/README.md)
 - [Cosmos-Predict2.5](../docker/cosmos-predict2.5/README.md)
