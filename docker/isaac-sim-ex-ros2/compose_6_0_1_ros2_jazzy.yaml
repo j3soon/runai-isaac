@@ -3,6 +3,9 @@ services:
     image: j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy
     pull_policy: always
     restart: unless-stopped
+    # Allow XFCE's session D-Bus on AppArmor hosts such as Brev VM Mode.
+    security_opt:
+      - apparmor=unconfined
     # Don't use `network_mode: host` here, as cloud environments may cause issues and cause `ros2 topic list` to hang.
     ports:
       - "${SSH_PORT:-2222}:22"
