@@ -2,6 +2,7 @@ services:
   isaac-sim-ex:
     image: j3soon/runai-isaac-sim-ex:6.0.1-ros2-jazzy
     pull_policy: always
+    restart: unless-stopped
     # Don't use `network_mode: host` here, as cloud environments may cause issues and cause `ros2 topic list` to hang.
     ports:
       - "2222:22"
