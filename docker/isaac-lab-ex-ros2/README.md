@@ -42,7 +42,9 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 
 > Skip this section if you're not using Brev.
 
-Use Brev VM Mode when the host NVIDIA driver must be selected explicitly. For Isaac Lab 2.3.2 (Isaac Sim 5.1.0), the setup script installs Ubuntu's packaged NVIDIA 580 driver, downloads the pinned Compose file, enables the application as a systemd service, attempts `docker compose up -d`, and schedules a reboot.
+Use Brev VM Mode when the host NVIDIA driver must be selected explicitly. For Isaac Lab 2.3.2 (Isaac Sim 5.1.0), the setup script installs Ubuntu's packaged NVIDIA 580 driver, downloads the pinned Compose file, pulls the image, enables the application as a systemd service, and schedules a reboot.
+
+> A clean deploy takes about 30 minutes and looks broken until that reboot. See the [`deploy-brev-launchable` skill](../../skills/deploy-brev-launchable/SKILL.md) and its [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the measured timeline, verification, and CLI behavior.
 
 1. Create a Brev Launchable using **VM Mode**. Keep the default Brev software environment so Docker, Docker Compose, and NVIDIA Container Toolkit are available.
 1. Add the contents of [`brev_setup_2_3_2_ros2_jazzy.sh`](./brev_setup_2_3_2_ros2_jazzy.sh) as the VM setup script.

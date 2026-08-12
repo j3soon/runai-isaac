@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deploy Brev Launchable"
+  short_description: "Deploy and verify a Brev GPU Launchable"
+  default_prompt: "Use $deploy-brev-launchable to deploy and verify my Launchable on NVIDIA Brev."
