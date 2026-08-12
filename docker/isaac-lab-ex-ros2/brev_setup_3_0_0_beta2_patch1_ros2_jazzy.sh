@@ -17,9 +17,14 @@ set -euo pipefail
 #
 # Brev's VM Mode base image already ships a 595.x kernel module, so in the
 # normal case this script installs no driver and never reboots -- the deploy is
-# just the image pull, roughly half the time of the 2.3.2 variant. It falls back
-# to installing the branch (and rebooting to load it) only if the base image
-# ever ships something else.
+# just the image pull. Measured on g6e.xlarge: ~24 minutes create-to-ready,
+# against ~30 for the 2.3.2 variant. The saving is smaller than the skipped
+# ~12-minute driver install suggests, because the pull dominates and this
+# image is larger (~38.7GB vs ~33.9GB). The real win is that nvidia-smi stays
+# healthy throughout instead of failing for ~28 minutes.
+#
+# It falls back to installing the branch (and rebooting to load it) only if the
+# base image ever ships something else.
 
 APP_DIR="/opt/isaac-lab-ex-ros2"
 COMPOSE_URL="https://raw.githubusercontent.com/j3soon/runai-isaac/main/docker/isaac-lab-ex-ros2/compose_3_0_0_beta2_patch1_ros2_jazzy.yaml"

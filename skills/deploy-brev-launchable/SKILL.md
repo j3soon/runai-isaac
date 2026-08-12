@@ -90,6 +90,12 @@ script's own reboot.
 <skill-dir>/scripts/launchable_test.sh --existing <name> [--skip-workload]
 ```
 
+- Prefer `--delete` on validation runs. An instance kept "just to look at" bills until
+  someone remembers it, and a lost session cannot clean up after itself.
+- The local tunnel ports are fixed, so two runs at once collide. Pass `--port-offset
+  10000` to the second when validating two Launchables concurrently; deploys are long
+  enough that running them in parallel costs no more in total.
+
 - Do not edit or move a script while a run is executing it. Renaming is safe, but
   rewriting its contents shifts the byte offsets the shell is still reading and the run
   dies mid-token.

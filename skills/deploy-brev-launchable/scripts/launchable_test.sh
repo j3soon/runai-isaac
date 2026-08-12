@@ -33,6 +33,7 @@
 # Usage:
 #   launchable_test.sh --launchable env-XXXX [--name NAME] [--delete]
 #   launchable_test.sh --existing NAME [--delete] [--force-recover] [--skip-workload]
+#   launchable_test.sh --launchable env-YYYY --port-offset 10000   # concurrent run
 #
 # Exit: 0 all services passed, 1 a check failed, 2 setup/timeout error.
 
@@ -43,6 +44,9 @@ LAUNCHABLE=""; NAME=""; EXISTING=""; DELETE=0; FORCE_RECOVER=0; SKIP_WORKLOAD=0
 BUILD_TIMEOUT="${BUILD_TIMEOUT:-3600}"
 SSH_TIMEOUT="${SSH_TIMEOUT:-900}"
 CONVERGE_TIMEOUT="${CONVERGE_TIMEOUT:-2700}"   # ~28min observed; allow headroom
+# Local tunnel ports are fixed, so two concurrent runs would collide on them.
+# Offset one of them (e.g. --port-offset 10000) to test two Launchables at once.
+PORT_OFFSET="${PORT_OFFSET:-0}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -52,6 +56,7 @@ while [ $# -gt 0 ]; do
     --delete)       DELETE=1; shift ;;
     --force-recover) FORCE_RECOVER=1; shift ;;
     --skip-workload) SKIP_WORKLOAD=1; shift ;;
+    --port-offset)  PORT_OFFSET="$2"; shift 2 ;;
     *) echo "unknown arg: $1"; exit 2 ;;
   esac
 done
@@ -184,7 +189,7 @@ SERVICES=(
   "ssh-in-container:2222:12222:tcp"
 )
 FWD=()
-for s in "${SERVICES[@]}"; do IFS=: read -r _ r l _ <<<"$s"; FWD+=(-L "$l:localhost:$r"); done
+for s in "${SERVICES[@]}"; do IFS=: read -r _ r l _ <<<"$s"; FWD+=(-L "$((l+PORT_OFFSET)):localhost:$r"); done
 
 log "opening ssh tunnel for ${#SERVICES[@]} services"
 ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no -N "${FWD[@]}" "$NAME" \
@@ -206,6 +211,7 @@ except Exception as e: print('FAIL:',e)
 RESULTS=(); FAILED=0
 for svc in "${SERVICES[@]}"; do
   IFS=: read -r sname remote local kind <<<"$svc"
+  local=$((local+PORT_OFFSET))
   ok=""
   for _ in $(seq 1 20); do
     if [ "$kind" = http ]; then

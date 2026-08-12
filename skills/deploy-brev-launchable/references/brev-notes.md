@@ -40,6 +40,35 @@ Two traps that make inference unreliable:
   minutes before the setup script actually finishes. Wait for the `ready` phase, which
   the systemd unit writes after Compose is up.
 
+## Prefer the Base Image's Driver Branch When the Application Allows It
+
+The long broken-looking window above exists only because the 2.3.2 variant installs a
+driver branch different from the one the base image already runs. The 3.0.0-beta2.patch1
+variant pins 595, which is what Brev's base image ships, so its setup script installs no
+driver and never reboots. Both measured on `g6e.xlarge`:
+
+| | 2.3.2 (580) | 3.0.0-beta2.patch1 (595) |
+| --- | --- | --- |
+| driver install | ~12 min | skipped |
+| reboot | yes | none |
+| create to ready | ~30 min | ~24 min |
+| `nvidia-smi` during setup | fails for ~28 min | healthy throughout |
+| image size | ~33.9GB | ~38.7GB |
+
+The wall-clock saving is smaller than the skipped install suggests, because the image
+pull dominates and the newer image is larger. The bigger benefit is that no phase of the
+deploy looks like a failure. When adding a variant, check the base image's loaded driver
+first and match it if the application's tested driver allows; only downgrade when the
+application genuinely requires it.
+
+Detect the branch rather than assuming it, so the script still works if the base image
+changes:
+
+```sh
+LOADED="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' /proc/driver/nvidia/version | head -1)"
+[[ "$LOADED" == "$DRIVER_BRANCH".* ]] && echo "no install needed"
+```
+
 ## Keep the Driver Install and the Image Pull Sequential
 
 Overlapping them looks like free parallelism — the pull needs no GPU driver, and the
