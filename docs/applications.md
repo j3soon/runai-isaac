@@ -32,6 +32,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 ## Shared Appendix
 
 - [Jupyter Lab](./jupyter-lab.md)
+- [Policy Server and Client Workloads](./policy-server-client.md)
 
 > Note: images without the `-ex` suffix are intended for non-interactive jobs, while `-ex` images are for interactive jobs with an all-in-one style environment/template.
 

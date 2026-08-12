@@ -130,7 +130,47 @@ variance. `--num-envs 4` costs little more wall-clock than `--num-envs 1`.
 
 ### On Run:ai
 
-`--net host` co-location does not translate directly to two Run:ai workloads, which would need a Service for pod-to-pod traffic. The simpler arrangement is one workload per GPU running both processes, which requires a combined image since the server and client images differ. Check the pair's combined VRAM against the target node before assuming they co-locate: with a large policy server such as Cosmos 3 they can exceed a `prod` L40's 46GB.
+On Run:ai, run the server and the client as **two separate workloads and address the server by its pod IP**. A Kubernetes Service is not required: pods in the same project namespace reach each other directly on the pod network, and every RoboLab policy client takes `--remote-host` / `--remote-port`, so nothing depends on the client's `localhost` default.
+
+```sh
+# 1. Policy server (Cosmos 3 image). Note the address it prints.
+runai training standard submit <name>-server --project <project> --node-pools prod \
+  --image j3soon/runai-cosmos:3 --image-pull-policy Always \
+  --gpu-devices-request 1 --large-shm \
+  --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite" \
+  --backoff-limit 0 --restart-policy Never \
+  -e HF_HOME=/mnt/nfs/<user>/hf -e HF_TOKEN=<token> \
+  --command -- bash -c 'export LD_LIBRARY_PATH=; cd /workspace; python -u -m cosmos_framework.scripts.action_policy_server_robolab --checkpoint-path nvidia/Cosmos3-Edge-Policy-DROID --format-prompt-as-json True --port 8000'
+
+# 2. Read the server pod IP from its log line "Server accessible at: ws://<ip>:8000/".
+
+# 3. Client (RoboLab image), pointed at that IP.
+runai training standard submit <name>-client --project <project> --node-pools prod \
+  --image j3soon/runai-robolab:0.3.0 --image-pull-policy Always \
+  --gpu-devices-request 1 --large-shm --user-group-source fromTheImage \
+  --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite" \
+  --backoff-limit 0 --restart-policy Never \
+  --command -- bash -c 'mkdir -p /mnt/nfs/<user>/robolab-output && ln -sfn /mnt/nfs/<user>/robolab-output /workspace/robolab/output && cd /workspace/robolab && /workspace/isaaclab/_isaac_sim/python.sh -u policies/cosmos3/run.py --task BananaInBowlTask --headless --num-envs 1 --remote-host <server-pod-ip> --remote-port 8000'
+```
+
+Verified end to end on this cluster with `Cosmos3-Edge-Policy-DROID`, two 1-GPU workloads on the `prod` node pool:
+
+```
+Task Name        Success   %       95% CI        Score(total) Time(s) Walltime(m)
+TOTAL (1 tasks)  1/1       100.0%  [15.8-98.7]   1.000        21.40   3.13
+BananaInBowlTask 1/1       100.0%  [15.8-98.7]   1.000        21.40   3.13
+```
+
+The client logged `Connected to <ip>:8000.`, the server logged inbound
+`[robolab-policy-server] prompt=...` calls, and the task completed successfully. Two
+workloads also sidestep the VRAM problem that co-location creates — a Cosmos 3 server plus
+a RoboLab client measured 49.5GB together, above a `prod` L40's 46GB (see
+[performance.md](./performance.md)) — because each gets its own GPU.
+
+Note the wide confidence interval: a single episode is a smoke test of the *wiring*, not a
+benchmark score. Raise `--num-envs` and the run count before quoting a success rate.
+
+The server pod IP changes when the pod restarts, so read it at launch rather than hard-coding it, and have the client wait for the endpoint before starting, since the two workloads schedule independently. See [Policy Server and Client Workloads](../../docs/policy-server-client.md) for the protocol details, the Run:ai UI walkthrough, and the same pattern for other image pairs.
 
 ## Run Locally
 

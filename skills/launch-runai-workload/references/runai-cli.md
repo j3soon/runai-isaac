@@ -70,6 +70,38 @@ The mount is `readwrite`, so one workspace covers both directions: stage inputs,
 - If authentication expired, use the appropriate `runai login` flow. Never print or persist a password/token in commands, logs, skill files, or Git.
 - Pass `--project <project>` to every mutating and verification command even when a default exists.
 
+## Two workloads can talk directly by pod IP
+
+A server/client split across two images (for example a policy server in one image and an
+Isaac Lab simulator in another) cannot share a container, and a standard submit has no
+sidecar. A Kubernetes Service is one answer, but it is not required: pods in the same
+project namespace reach each other directly on the pod network.
+
+```bash
+# In the server pod:
+runai workspace exec <server> --project <project> -- bash -c 'hostname -i'
+# -> 192.168.32.168
+
+# In the client workload, address the server by that IP:
+-e POLICY_URL=http://192.168.32.168:8005
+```
+
+Verified with a Cosmos 3 policy server in a workspace and an Isaac Lab eval client in a
+separate training workload: the client fetched `/info` and ran a full closed-loop
+evaluation against it. Have the client poll the endpoint before starting, since the two
+workloads schedule independently:
+
+```bash
+until curl -sf -m 5 "$POLICY_URL/info" >/dev/null; do sleep 15; done
+```
+
+The IP is not stable across pod restarts, so read it at launch time rather than hard-coding
+it, and prefer a Service for anything long-lived.
+
+Co-locating server and client this way also avoids `port-forward` entirely, which matters
+for large responses: a forwarded connection truncates them
+(`IncompleteRead(856060 bytes read, 566239 more expected)`).
+
 ## NFS mapping
 
 Do not use `--datasource` for now. On CLI `2.25`, a distributed submit copies `--nfs` into both `spec.storage` and `masterSpec.storage`, but copies `--datasource` into `spec.storage` only. The master pod then has no mount, writes to a non-existent path, and still exits `0`, so the output is lost silently. `--master-no-pvcs=false` does not fix it. Always mount with `--nfs`.
