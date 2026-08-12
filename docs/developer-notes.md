@@ -194,7 +194,7 @@ Allows non-preemptive GPU quota sharing across departments
 - Our users are trusted and cooperative, we can coordinate resource usage through communication during peak time.
 - Disable preemption saves everyone from the hassle of making their workloads preemptible.
 - > "A non-preemptible workload is only scheduled if in-quota and cannot be preempted after being scheduled, not even by a higher priority workload." -- [Run:ai Docs](https://run-ai-docs.nvidia.com/self-hosted/platform-management/runai-scheduler/scheduling/concepts-and-principles#priority-and-preemption)
-- Ask users to only use the `Workspace` type (unsure if this is necessary, will not work for multi-node workloads).
+- Ask users to only use the `Workspace` type (unsure if this is necessary). This does not cover multi-node workloads: those need the distributed `PyTorch` training type, which creates one master plus `--workers N` pods. Validated at 8 nodes x 8 GPUs; the submit mechanics live in the `launch-runai-workload` skill reference.
 - [Run:ai] Must set `Order of priority` to prevent scheduling issues.
 
 ![](./assets/dev-notes-runai-organization-department.png)
@@ -299,7 +299,6 @@ kubectl delete pod -n runai-backend keycloak-0
 - Future Works (for myself)
   - User guide for submitting batch of workloads through CLI/API instead of GUI.
   - Hosting a persistent NIM while allowing other workloads to send API requests.
-  - Test multi-node (distributed) training.
   - Shared storage for common dataset and model checkpoints.
   - Check Isaac Sim performance in VNC in container.
   - Test better data source solution aside from NFS (such as S3?)

@@ -211,9 +211,20 @@ runai training pytorch submit <name> \
   -- <image-entrypoint-arguments...>
 ```
 
-One worker plus the master creates two pods. Confirm whether the master participates in training for the selected image. If overriding commands, inspect `--master-command`, `--master-args`, and `--command` help rather than assuming one override applies identically to every pod.
+One worker plus the master creates two pods, and `--workers N` creates `N + 1`. The master **does** participate in training as `node_rank` 0: a `--workers 7` submit running eight processes per pod was measured producing `world_size: 64`, so size a job as `nnodes = workers + 1`.
 
-Mount with `--nfs`, never `--datasource`; see the NFS mapping section. Because a missing mount fails silently, assert it before the real command. Inside a `/run.sh "<cmd>" "<cmd>"` chain the guard must be a single bare command, because `/run.sh` runs each argument through unquoted `$1` word splitting and never re-parses `||`, `{`, or `;` as shell operators. `/run.sh` is `#!/bin/bash -ex`, so a nonzero exit aborts the chain:
+`--command` and `--master-command` are separate flags covering different pods. The validated pattern is to set both to the same thing — `--master-command "<string>"` for the master and `--command -- <argv...>` for the workers. Passing only `--command` was not tested against the master, so set both explicitly rather than relying on either default. The same split applies to `-e` versus `--master-environment-variable`, and to `--gpu-devices-request` versus `--master-gpu-devices-request`.
+
+**Measure the scaling shape before committing a large allocation.** On a validated 1/2/4/8-node
+sweep of one GPU-bound workload, crossing from single-node to multi-node cost a **one-time** step
+penalty as the intra-node interconnect gave way to the network; each doubling after that scaled
+close to linearly. A two-point extrapolation from the single-node baseline therefore reads as
+"scaling is poor" when it is only the first hop that is expensive. A third point is cheap next to
+a multi-day allocation. Note also that per-iteration wall-clock *grows* with node count even as
+throughput rises, so at a fixed step count more nodes buy a larger effective batch, not a shorter
+run — size the job for the batch you want.
+
+Mount with `--nfs`, never `--datasource`; see the NFS mapping section. Because a missing mount fails silently, assert it before the real command. In `/run.sh`'s default mode the guard must be a single bare command, because each argument is run through unquoted `$1` word splitting and `||`, `{`, and `;` are never re-parsed as shell operators (`--shell` lifts this — see below). `/run.sh` is `#!/bin/bash -ex`, so a nonzero exit aborts the chain:
 
 ```bash
 /run.sh "mountpoint -q /mnt/nfs" "<real command>"
@@ -224,6 +235,55 @@ When overriding the entrypoint with an actual shell (`--command -- bash -c '...'
 ```bash
 mountpoint -q /mnt/nfs || { echo "FATAL: /mnt/nfs is not a mount point"; exit 1; }
 ```
+
+### Multi-node rendezvous: `/run.sh` cannot pass it through
+
+The operator injects the Kubeflow rendezvous variables into every pod — `RANK` (pod index),
+`WORLD_SIZE` (pod count), `MASTER_ADDR`, and `MASTER_PORT` — and a multi-node launcher has to
+read them at runtime.
+
+`/run.sh` in its default mode cannot do that. It executes each argument as unquoted `$1`, which
+performs word splitting but **no parameter expansion**, so `$RANK` and `$MASTER_ADDR` reach the
+program as literal dollar-sign strings rather than values. A `torchrun` line written into a
+plain `/run.sh` argument therefore fails or silently rendezvouses wrong.
+
+On images shipping `/run.sh` v2 or newer, pass `--shell` and write the command normally:
+
+```bash
+--command -- /run.sh --shell 'exec torchrun --nnodes=$NNODES --nproc_per_node=<n> \
+  --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT <script> <args...>'
+```
+
+`--shell` runs each command through `eval`, so quoting, `$VARIABLES`, pipes, redirects and `&&`
+behave as written; v2 also sets `pipefail`, so a failing left-hand pipe stage is no longer masked.
+
+Check what an image ships with `/run.sh --version`; it prints the contract version, and an image
+predating the flag exits 1 with `Unknown option --version`, which identifies it as v1. Older
+instructions keep working unchanged on both, because `--shell` is opt-in — but a `--shell`
+instruction run against a v1 image fails immediately with `Unknown option --shell` rather than
+misbehaving, so state a minimum version in guides that use it. A published image only gains a new
+contract version when it is rebuilt, so several generations are always in circulation.
+
+Two options work on v1 images. Override the entrypoint with a real shell:
+
+```bash
+--command -- bash -c 'exec torchrun --nnodes="$NNODES" --node_rank="$RANK" ... <script>'
+```
+
+Or, to keep the submit line free of nested quoting, stage a launcher on shared storage and
+invoke it by path from both `--master-command` and `--command`. Staging it also lets both pod
+roles share one definition and keeps job shape (`nnodes`, iteration budget) in `-e` variables.
+Set the same variables with both `-e` and `--master-environment-variable`; they are separate
+flags, as with the command flags above.
+
+Prefix the final command with `exec` in any of these forms. Without it the workload runs as a
+child of `/run.sh`, which is PID 1, and a non-interactive bash defers signal handling while
+waiting on a foreground child — so the workload never sees the SIGTERM sent on stop and is
+SIGKILLed after the grace period, losing any shutdown checkpoint. Do not combine `exec` with
+`--upload-src`/`--upload-dest`, since the upload step runs after the commands.
+
+Note `--large-shm` has no `--master-*` counterpart. Verify the master pod actually received the
+larger `/dev/shm` rather than assuming the flag propagated.
 
 ## Persistent-storage probe
 
@@ -253,6 +313,23 @@ Use the matching `workspace` or `training pytorch` subcommand for logs/exec/dele
 
 While a workload is pending, inspect events for quota, placement, PVC/NFS, image pull, admission, or policy errors. While it is running, inspect application logs and GPU/process state. After completion, record the exit state before cleanup.
 
+### Console logs are not durable storage
+
+Log retrieval depends on the pod still existing on its node, which is weaker than it sounds:
+
+- **`suspend` destroys them.** Suspending deletes the pods, and every subsequent `logs` call
+  returns `one of requested resource was not found: not found`. On an eight-pod job suspended
+  mid-run, only the one pod log captured beforehand survived; the other seven were gone.
+- **Completed pods get pruned unpredictably.** Two workloads that completed on the *same day*
+  behaved differently: one still returned tens of thousands of lines, the other failed with
+  `unable to retrieve container logs for containerd://<id>`. This is per-node container
+  pruning, not an age threshold, so no retention window can be relied on.
+
+Treat console output as ephemeral. Capture anything worth keeping to shared storage while the
+workload is still running, and pull it before suspending or deleting. Application-written files
+under the mounted export are unaffected by any of this — only the container's stdout/stderr is
+at risk.
+
 Prefer `runai ... exec` or `runai ... bash` over node SSH. Use SSH only through an explicitly exposed, authorized workspace service; never assume cluster-node SSH access.
 
 ### `exec` is not a synchronous shell
@@ -265,6 +342,22 @@ Three separate behaviours, each of which makes a failed remote step look like a 
 
 Run remote work as several short `exec` calls, have the last one write a marker file to the mount, and poll for that marker. Verify by file state, never by `exec`'s return value or output. `runai ... exec --stdin` additionally cannot stream binary — see "Copying files onto the cluster".
 
+A fourth trap is self-inflicted: **`pkill -f` inside an `exec` matches the `exec`'s own shell**,
+because the pattern you are searching for is itself part of that shell's command line. It does
+not even need to be the `pkill` argument — a pattern appearing in an unrelated `rm -f
+/tmp/<name>.py` later in the same command is enough. The shell SIGTERMs itself, the call
+returns `command terminated with exit code 143`, and the remaining steps never run, so the
+cleanup looks done and is not. The `[x]` bracket trick is unreliable here for the same reason.
+Resolve the PID in one `exec` and kill it by number in the next, then confirm by state:
+
+```bash
+runai ... exec <name> --project <project> -- bash -lc 'ps -eo pid,args | grep "[m]yserver"'
+runai ... exec <name> --project <project> -- bash -lc 'kill <pid>'
+```
+
+Deleting the whole workspace is simpler when the pod is disposable — it takes the processes and
+any pod-local files with it.
+
 ### Never read a file that is being written
 
 Downloading an export while the pod regenerated it returned **0 bytes** on three separate cycles, and `tar` of a live log file failed with `file changed as we read it` while leaving the *previous* archive in place, which downloads as a plausible but stale file.
@@ -275,7 +368,7 @@ Build to `*.tmp` and `mv` into place (atomic within one filesystem), snapshot di
 
 Workloads outlive the things you watch them with. Over a multi-day run: `port-forward` dies after roughly 55 minutes (the endpoint stops answering while the process still looks alive), the auth token expires and its SSO re-login is **interactive**, a VPN drop makes `workload list` return empty and DNS fail — check the tunnel before concluding the jobs died — and a staging workspace ends whenever its `sleep` does, so give it `sleep 86400` rather than `sleep 3600`.
 
-Logs survive completion: `runai ... logs` still serves a `Completed` workload's output, which is lost only on `runai workload delete`.
+Logs often survive completion — `runai ... logs` will usually still serve a `Completed` workload's output — but this is not guaranteed and must not be treated as storage. See "Console logs are not durable storage" above.
 
 ## Cleanup
 
