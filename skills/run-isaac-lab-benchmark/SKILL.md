@@ -20,7 +20,7 @@ Use the repository runner and verifier to produce repeatable L40 measurements wi
 1. Record the image tag and digest, project, authorized pool, NFS mapping, runner and verifier hashes, driver, GPU, CPU, OS, task settings, and unique UTC run ID.
 2. Put all logs, KPI JSON, GPU inventories, topology records, hashes, and verifier output below one NFS run root.
 3. Run one unscored functional/topology qualification, followed by three scored repetitions per matrix cell.
-4. Keep scored runs unchanged: do not profile, mask GPUs, or add NCCL transport overrides.
+4. Keep scored runs unchanged: do not profile, mask GPUs, or add NCCL transport overrides. Submit them non-preemptible, and record the setting with the run metadata. A reclaimed pod truncates a repetition mid-measurement, and a partial KPI file is not obviously distinguishable from a complete one.
 5. Preserve every excluded run under `diagnostics/` with its original evidence and a written exclusion reason. Never silently replace an outlier.
 
 ## Preserve the benchmark topology

@@ -10,11 +10,11 @@ This repository is a documentation-and-assets workspace for running NVIDIA Isaac
 - `docs/`: User/developer documentation and screenshots (`docs/assets/`).
 - `thirdparty/omnicli/`: Bundled Omniverse CLI binaries used by `/run.sh`.
 - `.github/workflows/`: Per-image CI workflows for images built and published by this repository.
-- `.agents/skills/<name>/SKILL.md`: Repository task guides for agents (`add-runai-application`, `launch-runai-workload`, `run-isaac-lab-benchmark`, `admin-debug-runai-node`), with optional `references/` and `scripts/`.
+- `skills/<name>/SKILL.md`: Repository task guides for agents (`add-runai-application`, `launch-runai-workload`, `run-isaac-lab-benchmark`, `admin-debug-runai-node`), with optional `references/` and `scripts/`. `.agents/skills` and `.claude/skills` are symlinks to this directory, so each harness finds the same files; add and edit skills under `skills/` only.
 
 ## Agent Skills and Durable Notes
 
-- A request to "use the skill" for a task refers to `.agents/skills/`, not to a harness feature. These are plain files: locate the task's `SKILL.md`, read it, and follow it alongside this document.
+- A request to "use the skill" for a task refers to `skills/`. Harnesses that load skills automatically reach them through the `.agents/skills` and `.claude/skills` symlinks; otherwise treat them as plain files: locate the task's `SKILL.md`, read it, and follow it alongside this document.
 - Development machines here are ephemeral. Record durable findings in the repository, not in an assistant's local memory: reusable pitfalls and their workarounds in `docs/developer-notes.md`, cluster/node failures in `troubleshooting.md`, image-specific behavior in that image's `docker/<name>/README.md`, and workflow changes in the relevant `SKILL.md`.
 - Keep such notes environment-agnostic. Use placeholders (`<YOUR_LAB>`, `<NODE_NAME>`, `<YOUR_USERNAME>`) rather than real hostnames, accounts, or tokens.
 

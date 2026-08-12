@@ -137,7 +137,7 @@ Notes:
 
 - Resolve the NFS server and export with `runai datasource describe <asset> --project <project> --type nfs --output json` rather than hard-coding them.
 - Keep `HF_HOME` on the NFS mount. The first run downloads about 16GB of checkpoints there and later jobs reuse them; container-local caches are lost when the pod exits.
-- Add `-e HF_TOKEN=<token>` for gated repositories such as `Cosmos-Guardrail1`. It is readable through `runai workload describe`, so prefer a secret when the project is shared.
+- Add `-e HF_TOKEN=<token>` for gated repositories such as `Cosmos-Guardrail1`. It is readable through `runai workload describe`, so on a shared project ask an administrator for a credential asset and pass `--env-my-credentials type=genericSecret,name=HF_TOKEN,credential-name=<credential>,key=HF_TOKEN` instead. Creating one yourself typically fails with `403 Forbidden`.
 - Do not nest double quotes inside `--command`; they are flattened before reaching the container and the command fails with a syntax error.
 - `Cosmos3-Edge` fits the 46GB L40. `Cosmos3-Nano` leaves little headroom for video on that GPU.
 - Verify outputs from a second workload. A pod can exit successfully with its output lost, and the run's `inputs/` entries are symlinks into a pod-local temp directory that does not survive.

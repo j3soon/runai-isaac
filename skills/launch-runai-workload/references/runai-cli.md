@@ -99,6 +99,45 @@ Use `secrets/env.sh` only as a cross-check. Reject values such as `<FTP_USER>` a
 
 The repository convention uses one lab-scoped export mounted at `/mnt/nfs`, with user-owned paths below `/mnt/nfs/<username>`. Verify the selected project belongs to the same lab scope.
 
+## Secrets and environment variables
+
+Three ways to set a variable, in increasing order of exposure. The first is the safest but usually needs an administrator to provision the credential; see the note below before planning around it.
+
+```bash
+# 1. Credential asset. Requires cluster 2.22+ (2.23+ for ngcApiKey).
+#    `create` often returns 403 for a user account -- see the note below.
+runai my-credential create hf-token --type genericSecret --item key=HF_TOKEN,value="$HF_TOKEN"
+runai my-credential list
+runai training standard submit ... \
+  --env-my-credentials type=genericSecret,name=HF_TOKEN,credential-name=hf-token,key=HF_TOKEN
+
+# 2. An existing Kubernetes secret in the project namespace.
+--env-secret HF_TOKEN=<secret-name>,key=<secret-key>
+
+# 3. A plain value, visible to every project member.
+-e HF_TOKEN=<token>
+```
+
+In `--env-my-credentials`, `name=` is the environment variable to set, `credential-name=` is the credential asset, and `key=` selects one item inside it (required only for `genericSecret`). One credential can hold several pairs; repeat `--item` when creating it.
+
+Form 3 stores the token in the workload spec, where `runai workload describe` prints it back to anyone with access to the project. Use it only for a non-secret value or a single-user project. Gated Hugging Face repositories (`Cosmos-Reason2-2B`, `Cosmos-Guardrail1`) need a real token in every non-interactive workload, because `hf auth login` is interactive and cannot run there.
+
+Read the token into the environment rather than typing it: `read -rs HF_TOKEN` keeps the literal `$HF_TOKEN` in shell history instead of the value.
+
+Do not plan a workload around creating a credential. `runai my-credential create` needs a permission a user account may not have, and fails with a bare `403 Forbidden` that looks like a malformed `--item` rather than an authorization error; `list` still succeeds, so the API being reachable proves nothing. Use form 1 only against a credential an administrator has already provisioned (`runai credential list` shows them), and otherwise use form 2 or form 3 with its exposure understood.
+
+Related flags: `--image-pull-my-credentials type=dockerRegistry,name=<credential>` authenticates a private image pull, and `--secret-volume path=<path>,name=<secret>` mounts a secret as files when an application wants a file rather than a variable.
+
+The flag contract above is read from CLI 2.25.27 `--help`; injection into a running pod is unverified. On first use, confirm with `runai training standard exec <name> --project <project> -- printenv HF_TOKEN` before concluding a gated download failed for another reason.
+
+## Preemption
+
+`--preemptible` lets a workload schedule above guaranteed quota and be reclaimed at any time. The flag is not uniform across workload types: on CLI 2.25.27 only `runai workspace submit` accepts it. Both `runai training standard submit` and `runai training pytorch submit` accept `--preemptibility <preemptible|non-preemptible>` and reject `--preemptible` as an unknown flag, so the workspace example in the root `README.md` cannot be copied into either training submit unchanged. Confirm with the exact subcommand's `--help`.
+
+It is the only unexpected asymmetry among the three submit shapes: a full flag diff on 2.25.27 shows 97 distinct flags, of which 21 differ across subcommands, and every other difference is the expected `--master-*`/`--workers`/`--no-master` set on `pytorch` and `--parallelism`/`--runs` on `standard`.
+
+Treat preemption as a correctness setting, not only a scheduling one. A reclaimed pod loses in-flight work and can leave a partial artifact that reads as a complete one. Keep scored benchmark repetitions and any run with an unguarded output path non-preemptible; reserve preemptible for interactive or restartable work. `install.md` documents the cluster's priority classes.
+
 ## Finite single-pod training
 
 Use this shape for a bounded headless run:
@@ -138,7 +177,18 @@ runai workspace submit <name> \
   --command -- <service-command> <arguments...>
 ```
 
-Add only the required `--port` or `--external-url` settings. Verify authentication/authorization before exposing Jupyter, VSCode, noVNC, SSH, TensorBoard, or another service. Suspend or delete the workspace when no longer needed.
+Expose a service only when the user must reach it from outside the cluster:
+
+```bash
+--port "service-type=NodePort,container=8000,external=30080"
+--external-url "container=8000,url=https://<host>,authusers=<user>,authgroups=<group>"
+```
+
+`--external-url` carries the Run:ai authorization fields; a bare `--port` NodePort does not. Verify authentication before exposing Jupyter, VSCode, noVNC, SSH, TensorBoard, or another service, and restrict anything that grants a shell, a notebook kernel, or write access to `/mnt/nfs` to the authorized user.
+
+Exposure is not the only reachability path: the pod network is shared, so a service bound to `0.0.0.0` without a token is reachable from other pods even with no port or URL exposed. For a service only you need, `runai workspace port-forward <name> --project <project> --port <local>:<container>` requires no exposure at all and is the safer default — but the forward dies after roughly 55 minutes, so re-establish it rather than trusting a stale one (see session lifetimes).
+
+Suspend or delete the workspace when no longer needed.
 
 ## Distributed PyTorch
 
@@ -236,3 +286,11 @@ runai workspace delete <name> --project <project>
 ```
 
 Delete only the workload type and name created for validation. Confirm the exact target with `describe` first. Do not delete durable NFS outputs with the workload.
+
+For an idle interactive workspace the user still wants, suspend instead of deleting. Suspending releases the GPUs while keeping the workload and its definition; deleting is irreversible and also destroys the pod logs:
+
+```bash
+runai workspace suspend <name> --project <project>
+runai workspace resume <name> --project <project>
+runai training standard suspend <name> --project <project>
+```

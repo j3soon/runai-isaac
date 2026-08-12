@@ -65,7 +65,7 @@ Use the installed CLI's `--help` output as the command contract. Adapt reference
 - If a Dockerfile exists, inspect its base image, architecture, entrypoint, dependency pins, build context, secrets, and output paths before building.
 - If only Conda, venv, Python lock files, or a local environment exists, create a reproducible image from the declared dependencies. Do not copy a host virtual environment into an image.
 - A Run:ai submission always needs a cluster-accessible container image. A local environment without an image can only be tested locally until it is containerized and pushed to an accessible registry.
-- Do not put credentials, tokens, private keys, or user data in image layers. Use runtime secrets or approved Run:ai credentials.
+- Do not put credentials, tokens, private keys, or user data in image layers. Use runtime secrets or approved Run:ai credentials; [references/runai-cli.md](references/runai-cli.md) gives the exact flags and their exposure trade-offs. A plain `-e <VAR>=<token>` is readable by every project member through `runai workload describe`.
 
 ## 4. Prove the storage contract
 
