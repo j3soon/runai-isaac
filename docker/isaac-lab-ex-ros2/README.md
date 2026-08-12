@@ -44,13 +44,29 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 
 Use Brev VM Mode when the host NVIDIA driver must be selected explicitly. For Isaac Lab 2.3.2 (Isaac Sim 5.1.0), the setup script installs Ubuntu's packaged NVIDIA 580 driver, downloads the pinned Compose file, pulls the image, enables the application as a systemd service, and schedules a reboot.
 
-> A clean deploy takes about 30 minutes and looks broken until that reboot. See the [`deploy-brev-launchable` skill](../../skills/deploy-brev-launchable/SKILL.md) and its [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the measured timeline, verification, and CLI behavior.
+Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instead. Brev's base image already ships 595, so that setup script normally installs no driver and skips the reboot, leaving only the image pull.
+
+> The 2.3.2 deploy takes about 30 minutes and looks broken until its reboot. See the [`deploy-brev-launchable` skill](../../skills/deploy-brev-launchable/SKILL.md) and its [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the measured timeline, verification, and CLI behavior.
+
+| Isaac Lab | Isaac Sim | ROS 2 | Brev URL |
+|-----------|-----------|-------|----------|
+| 2.3.2 | 5.1.0 | Jazzy | [![ Click here to deploy.](https://brev-assets.s3.us-west-1.amazonaws.com/nv-lb-dark.svg)](https://brev.nvidia.com/launchable/deploy?launchableID=env-3HmXnNzoex3D9hUuIyUDkeFJbT4) |
+| 3.0.0-beta2.patch1 | 6.0.1 | Jazzy | [![ Click here to deploy.](https://brev-assets.s3.us-west-1.amazonaws.com/nv-lb-dark.svg)](https://brev.nvidia.com/launchable/deploy?launchableID=env-3Hp8A2xYfls4xle14W0891vLF4p) |
+
+1. Click one of the Brev badges above to navigate to the Brev launchable page.
+1. (Optional) If you haven't logged in to Brev, click `Sign In`, you will be prompted to log in or register. After logging in, you will be redirected back to the launchable page.
+1. (Optional) If you have multiple Brev organizations, make sure to select the correct one from the dropdown menu in the top right corner of the page.
+1. Click `Deploy Launchable`, and wait for provisioning to complete. (If it failed, delete and re-deploy the launchable.)
+1. Click `Go to instance page` to open the Brev workspace in a new browser tab, and wait for the `script` part to switch from `Executing` to `Completed`. (You will get 404 errors if not waiting until script completes)
+1. Finally, use the `novnc`, `jupyter`, or `code-server` links.
+
+To build your own launchable, or to deploy another version:
 
 1. Create a Brev Launchable using **VM Mode**. Keep the default Brev software environment so Docker, Docker Compose, and NVIDIA Container Toolkit are available.
-1. Add the contents of [`brev_setup_2_3_2_ros2_jazzy.sh`](./brev_setup_2_3_2_ros2_jazzy.sh) as the VM setup script.
+1. Add the contents of the setup script for the version you want as the VM setup script: [`brev_setup_2_3_2_ros2_jazzy.sh`](./brev_setup_2_3_2_ros2_jazzy.sh) or [`brev_setup_3_0_0_beta2_patch1_ros2_jazzy.sh`](./brev_setup_3_0_0_beta2_patch1_ros2_jazzy.sh).
 1. Configure the ports or Secure Links you need from the Compose file: SSH `2222`, VNC `5900`, noVNC `6080`, VS Code `8080`, and JupyterLab `8888`.
-1. Deploy the Launchable. The setup script schedules a reboot approximately one minute after it completes. A warning from the initial Compose startup can be expected while the newly installed userspace driver and the still-loaded kernel module differ.
-1. Reconnect after the reboot and verify the driver and application:
+1. Deploy the Launchable. Track progress with `cat /var/lib/isaac-lab-ex-ros2-setup.state` and wait for `ready`. The 2.3.2 script installs a different driver branch than the base image provides, so it schedules a reboot once the image is pulled and `nvidia-smi` fails until then; the 3.0.0-beta2.patch1 script keeps the base image's driver and starts the application without rebooting.
+1. Verify the driver and application, reconnecting first if the VM rebooted:
 
    ```sh
    nvidia-smi
