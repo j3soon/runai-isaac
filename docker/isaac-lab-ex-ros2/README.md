@@ -42,7 +42,9 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 
 > Skip this section if you're not using Brev.
 
-Use Brev VM Mode when the host NVIDIA driver must be selected explicitly. For Isaac Lab 2.3.2 (Isaac Sim 5.1.0), the setup script installs Ubuntu's packaged NVIDIA 580 driver, downloads the pinned Compose file, pulls the image, enables the application as a systemd service, and schedules a reboot.
+Brev provides four runtime modes: **VM Mode**, **Single Container**, **Docker Compose**, and **Single-node Kubernetes**. VM Mode is the only one that allows the host NVIDIA driver version to be selected and installed. The other three modes run on the provider-managed host driver; changing CUDA libraries inside a container does not replace that host kernel driver.
+
+This matters for reproducibility across older Isaac releases. [Isaac Lab 2.3.2 supports Isaac Sim only through 5.1.0](https://github.com/isaac-sim/IsaacLab/blob/v2.3.2/README.md), and our Isaac Sim 5.1.0 workload fails with NVIDIA driver 595. NVIDIA tested Isaac Sim 5.1.0 with Linux driver [580.65.06](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/requirements.html), so its setup script installs Ubuntu's packaged 580 driver. It then downloads the version-specific Compose file from this repository's `main` branch, pulls the image, enables the application as a systemd service, and schedules a reboot. VM Mode prevents a provider driver upgrade from silently making preserved 2.3.2 or 5.1.0 containers unusable.
 
 Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instead. Brev's base image already ships 595, so that setup script normally installs no driver and skips the reboot, leaving only the image pull.
 
@@ -72,9 +74,7 @@ To build your own launchable, or to deploy another version:
    nvidia-smi
    sudo systemctl status isaac-lab-ex-ros2.service
    sudo docker compose \
-     --project-name isaac-lab-ex-ros2 \
      -f /opt/isaac-lab-ex-ros2/compose.yaml \
-     -f /opt/isaac-lab-ex-ros2/compose.override.yaml \
      ps
    ```
 
