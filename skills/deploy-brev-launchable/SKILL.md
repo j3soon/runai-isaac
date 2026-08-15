@@ -40,11 +40,15 @@ mistaken for readiness, and an SSH path that cannot work.
 
 - Deploy as a Launchable: `brev create <name> --launchable <id>`. The Launchable carries
   the instance type, disk size, and setup script.
-- Do not substitute `brev create --startup-script`. There is no disk-size flag, so it
-  provisions the small default and a large image will not fit; `--min-disk` is only a
-  filter and matches the type's configurable range, not the size provisioned.
+- Do not substitute `brev create --startup-script`. `brev create` has no disk-size flag
+  (`--min-disk` only filters which types are considered), and on `workspaceVersion: v1`
+  the setup script does not attach at all, so the instance boots bare.
 - Use `--dry-run` to confirm the resolved instance type and storage for free before
-  spending anything.
+  spending anything. It prints the Launchable's storage; for a plain create it prints only
+  the type.
+- If a deployment genuinely must avoid the Launchable, drive the API directly rather than
+  the `create` flags, and expect to apply the setup script over SSH afterwards. See
+  "Creating an Instance Without a Launchable" in [references/brev-notes.md](references/brev-notes.md).
 - Editing the repository's setup script does not change an existing Launchable. The
   Launchable holds its own copy, so a script change must be pasted into the console
   before it can be tested.
@@ -108,5 +112,10 @@ script's own reboot.
   it, and say what it cost. An idle GPU instance is a silent charge.
 - Prefer `--delete` on validation runs so a lost session cannot orphan an instance;
   confirm removal with `brev ls --all` rather than assuming.
+- An instance the user explicitly asked for is theirs to dispose of. Verification ending
+  is not authorization to delete it; report the hourly cost and ask.
+- `DELETING` persists for minutes after the machine is terminated and billing has stopped.
+  Wait it out instead of re-issuing deletes; see brev-notes.md for how to tell which of the
+  two deletion tasks is still running.
 - Report the Launchable, instance type and price, elapsed phases, service and workload
   results, anything left running, and any check that did not actually execute.

@@ -90,6 +90,16 @@ it gives up. The failure looks like a service that never started.
 - That config is written only once the instance exists, so run `brev refresh` *after*
   creating it. Refreshing before creation silently leaves no host entry, and every later
   `ssh` fails with `Could not resolve hostname`.
+- "After it exists" is not enough: wait until the relay itself is provisioned. For the
+  first ~2 minutes after `RUNNING`, the API reports the raw `ec2-*.compute-1.amazonaws.com`
+  hostname on port 22, and only later swaps in the relay host and per-instance high port.
+  A `brev refresh` inside that window writes a host entry that can never connect, and the
+  resulting timeout is indistinguishable from a broken instance. Poll the workspace JSON
+  until `environment.ssh_access` is non-empty and `environment.instance.ssh_hostname` is
+  the relay, then refresh. Measured: `RUNNING` at ~100s, relay at ~220s.
+- The EC2 security group does allow port 22, but only from three Brev relay addresses, so
+  a direct connection from anywhere else times out by design. `exposedPorts: []` on the
+  workspace is normal and is not what blocks SSH.
 
 ## Instance Visibility Is Org-Scoped, and `brev ls` Hides Teammates
 
@@ -115,16 +125,93 @@ matters.
 inline with `brev ls --all -o <ORG>`. Seeing an instance is also not access to it —
 SSH into a teammate's node requires the owner to run `brev grant-ssh`.
 
+## Creating an Instance Without a Launchable
+
+Read the Launchable's configuration first — it is the specification to reproduce, and both
+ways of reading it are free. `brev create --launchable <id> --dry-run` prints the name,
+description, instance type, storage, and build mode without creating anything. For the
+whole definition, including the port list and the id of its lifecycle script,
+`GET /api/launchables/<id>/now` returns `createWorkspaceRequest` (`workspaceGroupId`,
+`cloudCredId`, `instanceType`, `storage`) alongside `buildRequest.ports`. Neither returns
+the script body; `GET /api/launchable/lifecycle-script?envId=<id>&scriptId=<ls-id>` does.
+
+`brev create` cannot express a Launchable's disk size or port mappings, but the API it
+calls can. `POST /api/organizations/<ORG>/workspaces` on
+`https://brevapi.us-west-2-prod.control-plane.brev.dev`, with the CLI's bearer token from
+`~/.brev/credentials.json`, accepts the whole configuration:
+
+```json
+{"name":"<NAME>","cloudCredId":"devplane-brev-1-credential",
+ "workspaceClassId":"2x8","workspaceTemplateId":"4nbb4lg2s",
+ "instanceType":"g6e.xlarge","diskStorage":"256Gi",
+ "portMappings":{"jupyter-lab":"8888","novnc":"6080","vscode":"8080"},
+ "workspaceVersion":"v1"}
+```
+
+- `workspaceVersion: "v1"` is mandatory. Omit it and the API rejects the whole request
+  with `400 Legacy workspace version unsupported`, which reads like a client-version
+  problem rather than a missing field.
+- `portMappings` is a *name to port* map, and it is what opens the application ports.
+- Do not hand-write this payload from guesswork. Point `BREV_API_URL` at a local HTTP
+  server and run the real `brev create`: the CLI honors the variable, so the exact request
+  body lands in your log and nothing reaches Brev. Forward `GET`s to the real host so the
+  CLI's `/api/me` and `/api/organizations` preflight succeeds, and return an error for the
+  `POST` so no instance is created. Running that against `--launchable <id>` dumps the
+  Launchable's own create payload, which is the authoritative template to copy.
+- A deleted instance holds its name until deletion finishes; reusing it immediately fails
+  with `400 duplicate workspace with name <NAME>`.
+
+What the API will *not* do is attach the setup script. Both `startupScript` and an inline
+`vmBuild.lifeCycleScriptAttr.script` are silently dropped on `workspaceVersion: v1` — the
+instance boots with all three cloud-init parts (`always.sh`, `instance.sh`, `once.sh`)
+empty. A Launchable works because its script is a registered object referenced by id
+(`ls-…`), which the CLI fetches from `/api/launchable/lifecycle-script` before creating.
+Verify by decoding `environment.provision.Directive.CreateInstanceRequest.user_data_base64`
+rather than trusting the create response, which echoes neither field.
+
+Without a Launchable, apply the script over SSH once the relay is up. It ends in a
+scheduled reboot, so detach it (`setsid nohup … &`) or the reboot kills the run:
+
+```bash
+scp docker/isaac-lab-ex-ros2/brev_setup_2_3_2_ros2_jazzy.sh <INSTANCE>:/tmp/setup.sh
+ssh <INSTANCE> 'chmod +x /tmp/setup.sh; setsid nohup /tmp/setup.sh >/tmp/setup.out 2>&1 </dev/null &'
+```
+
+Measured end to end on `g6e.xlarge` with a 256GiB disk: `installing-driver` ~1 min,
+`pulling-image` ~6 min, `rebooting` ~22 min, `ready` with the container up at ~24 min —
+then all five service probes and both Isaac workloads pass, the same as the Launchable.
+
+## Deletion Reports `DELETING` Long After Billing Stops
+
+Deleting is two steps, and `brev ls --all` shows `DELETING` for both. The machine is gone
+once the `terminate-environment-instance` task succeeds; the `delete-environment` task
+that follows only clears the control-plane record, and that took ~4 more minutes with the
+name still listed. Do not read the lingering row as a failed delete and issue more delete
+calls. To tell the two apart, check the tasks:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$BREV_API/api/workspaces/<ID>" \
+  | python3 -c "import sys,json;e=json.load(sys.stdin)['environment'];print(e['instance']['status']);[print(t['name'],t['status']) for t in e['tasks']]"
+```
+
+`lifecycle_status: terminating` with `terminate-environment-instance: succeeded` means the
+charge has stopped. Still confirm the row eventually disappears from `brev ls --all`.
+
 ## Other Brev CLI Behavior
 
 - `brev ls --json` wraps its array as `{"workspaces": [...]}` and exposes `build_status`,
   `shell_status`, `health_status`, and `status` per instance. Parse that rather than the
   table, whose output carries spinner escape codes.
 - `brev create` has no disk-size flag. `--min-disk` is only a *filter*, and it matches the
-  instance type's configurable range rather than the size actually provisioned, so a
-  filter for 200GB happily returns a type that provisions 10GB. Only a Launchable sets the
-  disk, which makes `brev create --launchable <id>` the sole CLI path to a large root
-  disk — and this image does not fit in the 10GB default.
+  instance type's configurable range rather than the size provisioned, so a filter for
+  200GB tells you nothing about what you get. What `create` actually requests is
+  `diskStorage: "120Gi"`, hardcoded in CLI v0.6.334 — *not* the `TARGET_DISK` value the
+  `brev search` table shows for the type (10 for `g6e.xlarge`). 120GiB does fit this
+  image. Confirm the request rather than reading it off the search table, and confirm the
+  result with `df -h /` on the instance.
+- A Launchable is not the only way to set the disk. The console's instance-creation page
+  offers "Choose disk size", and the API takes `diskStorage` directly — see the section on
+  creating without a Launchable below.
 - `brev login --token <sso-token>` is good for one short window: the token expires in ~15
   minutes and the stored session lasts a few hours at most. A long deploy can outlive its
   own credentials, leaving a running GPU instance that cannot be deleted until the next
