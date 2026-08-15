@@ -80,6 +80,19 @@ To build your own launchable, or to deploy another version:
 
 The systemd unit retries until the GPU driver is ready, while Compose's `restart: unless-stopped` policy keeps the container running across later Docker daemon and VM restarts. The host workspace is `/workspace`.
 
+### Verified Instance Types (2.3.2)
+
+The 2.3.2 setup script needs no per-GPU changes: driver branch 580 covers both Ada and Turing, and the same script resolved `580.178.04` on each. Measured with 256GiB disk and 32GB RAM, running all five service probes plus Isaac Sim init and a 3-iteration cartpole training:
+
+| Instance | GPU | VRAM | RAM | $/hr | Setup to `ready` | Cartpole fps |
+|----------|-----|------|-----|------|------------------|--------------|
+| `g6e.xlarge` | L40S | 46068 MiB | 32GiB | $2.23 | ~23 min | 158331 |
+| `g4dn.2xlarge` | T4 | 15360 MiB | 32GiB | $0.90 | ~22 min | 119075 |
+
+The T4 reaches about 75% of L40S throughput at roughly 40% of the cost, and 15GB of VRAM is ample for cartpole — a heavier scene may not fit. Treat small throughput differences as noise: two `g6e.xlarge` runs of the same image differed by ~6% (158331 and 168972).
+
+> Pick x86_64. AWS `g5g.*` instances carry a T4**g** on **arm64** and cannot run this image, despite matching on GPU name, VRAM, and RAM in instance searches.
+
 ## Local
 
 ```sh

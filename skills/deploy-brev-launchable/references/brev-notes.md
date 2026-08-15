@@ -200,6 +200,17 @@ Measured end to end on `g6e.xlarge` with a 256GiB disk: `installing-driver` ~1 m
 `pulling-image` ~6 min, `rebooting` ~22 min, `ready` with the container up at ~24 min —
 then all five service probes and both Isaac workloads pass, the same as the Launchable.
 
+Validating two instances at once costs no more than one after the other and halves the
+wall clock, since a deploy is ~23 minutes of waiting either way. Create both, then give
+the second `--port-offset 10000` so its local tunnel ports do not collide. Confirmed with
+an L40S and a T4 deploy running concurrently from one watcher; see the verified instance
+table in `docker/isaac-lab-ex-ros2/README.md` for the per-GPU results.
+
+When comparing GPUs this way, match RAM and disk explicitly and check the architecture.
+Instance searches rank by GPU name, VRAM, and RAM, which lets an `arm64` type (AWS
+`g5g.*`, carrying a T4**g**) sit next to the `x86_64` type you want with everything else
+looking identical.
+
 ## Deletion Reports `DELETING` Long After Billing Stops
 
 Deleting is two steps, and `brev ls --all` shows `DELETING` for both. The machine is gone
