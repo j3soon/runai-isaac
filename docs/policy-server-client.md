@@ -62,6 +62,11 @@ first proceeds and the rest sit until they time out. Observed with five concurre
 on one server: all five failed. Scale out by running one server per client, not one shared
 server.
 
+The server's output is **not deterministic**, and the client's `--seed` does not change that:
+the policy runs in a separate process and a diffusion action head samples each chunk. Three
+50-episode evaluations of one checkpoint at an identical seed scored 68%, 74% and 66%. Repeat
+an evaluation before attributing a difference to a change you made.
+
 The server also reports its expected inputs, so read them rather than guessing:
 `get_modality_config` over the wire, or `experiment_cfg/conf.yaml` in the checkpoint. A
 client whose camera names do not match gets `RuntimeError: Server error: '<key>'`; a client

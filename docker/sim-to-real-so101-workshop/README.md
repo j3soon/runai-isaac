@@ -151,9 +151,12 @@ Run:ai cluster:
 
 | checkpoint | eval configuration | episodes | success |
 | --- | --- | ---: | ---: |
-| `..._vials_rack_left` (**sim-only**, the one the guide names) | official, nothing overridden | 10 | **10/10 (100.0%)** |
+| `..._vials_rack_left` (**sim-only**, the one the guide names) | official, nothing overridden | 3 x 50 | **104/150 (69.3%)** |
 | `..._vials_rack_left_sim_and_real` | official `--rename_map` + "yellow rack" prompt | 10 | 5/10 (50.0%) |
 | `..._vials_rack_left_sim_and_real` | inverted `--rename_map`, default prompt | 30 | 11/30 (36.7%) |
+
+69.3% with a 95% Wilson interval of 61.5-76.2% sits at the top of the guide's stated 50-70%,
+so the reference reproduces.
 
 Two variables move this number, and both are easy to get wrong:
 
@@ -165,19 +168,33 @@ Two variables move this number, and both are easy to get wrong:
   `--lang_instruction`, and loses 13 points. **If a reference checkpoint scores far below
   its published number, suspect the eval configuration before the policy.**
 
-The guide states 50-70%. 100% is above that, consistent with `-Eval` being the easiest
-variant (fixed orange robot, no lighting or mat randomization) while the guide's caveat is
-explicitly about vial roll and lighting, which is what `-DR-Eval` varies. Ten episodes at
-seed 1984 is also a small sample — the 95% CI for 10/10 is ~69-100%.
+#### The run-to-run spread is larger than it looks
 
-Read success rates against the failure mode, not just the tally. Every one of those ten
-episodes terminated between step 222 and 398, none reaching the 450-step cap; a failing
-policy instead produces clean 450-step timeouts (19 of 30 in the bottom row). Early
-termination in every episode is the success term firing.
+The top row is three independent 50-episode runs, all at the client's default `--seed 1984`
+against the same checkpoint:
 
-The 30-episode run also shows the score is not stationary within a run: episodes 1-11 hit
-63.6% while episodes 12-30 hit 21%. Report the episode count alongside any success rate,
-and do not compare a 10-episode number against a 30-episode one.
+| run | success | 450-step timeouts |
+| --- | ---: | ---: |
+| 1 | 34/50 (68.0%) | 16 |
+| 2 | 37/50 (74.0%) | 13 |
+| 3 | 33/50 (66.0%) | 17 |
+
+A shared seed fixes the vial placements, so those runs saw **identical initial conditions**.
+The 8-point spread therefore comes entirely from the policy server's diffusion sampling,
+which the client's seed does not reach. Treat a single evaluation as a draw from a
+distribution roughly +/-4 points wide at n=50, and do not seed-match your way out of it.
+
+**A 10-episode result is close to meaningless here.** An earlier run of this exact
+configuration scored 10/10 and read as "100%"; the first ten episodes of run 1 above, same
+seed and same checkpoint, scored 8/10. Neither is the policy's rate. Quote at least 50
+episodes, report the episode count with the rate, and never compare across counts — the
+30-episode row above is not comparable to the 10-episode one.
+
+Read success rates against the failure mode, not just the tally. Across all 150 episodes
+there were exactly two outcomes: a success terminating between step 205 and 444, or a clean
+450-step timeout. Successes equalled 50 minus the timeout count in every run, which is the
+consistency check worth running before believing a number. A run whose episodes end after a
+handful of steps is neither outcome, and is an environment fault.
 
 The full recipe is in [Reproducing the published result](#reproducing-the-published-result)
 below. Evidence, including the exact submitted scripts, is under
@@ -240,7 +257,7 @@ Resolve the NFS server and export with `runai datasource describe <asset> --proj
 
 ### Reproducing the published result
 
-This is the full recipe that produced 10/10, as two workloads. It reproduces
+This is the full recipe that produced 104/150, as two workloads. It reproduces
 [upstream's evaluation page](https://docs.nvidia.com/learning/physical-ai/sim-to-real-so-101/latest/11-sim-evaluation.html),
 which runs both halves as two terminals in one container.
 
@@ -295,7 +312,13 @@ Points that decide whether this reproduces or not:
   the pod IP after any restart — it changes.
 
 Wall clock on this cluster: ~9 minutes for the server (8m39s of that is the 22GB image pull,
-then a fast checkpoint load), and ~6 minutes for 10 episodes plus Isaac Sim startup.
+then a fast checkpoint load once the checkpoint is already on the shared mount), and ~35
+minutes for 50 episodes plus Isaac Sim startup.
+
+To raise the episode count, run **independent server+client pairs in parallel** rather than
+one longer evaluation. Episodes are sequential within a client and the ZMQ server is
+`REQ`/`REP`, so three pairs on 6 GPUs collect 150 episodes in the wall time of 50. Give each
+client its own server; pointing several clients at one server stalls all but the first.
 
 ### Verifying a success rate before believing it
 
@@ -306,9 +329,12 @@ meaningful alongside how the episodes ended. Extract the step at which each epis
 grep -aoE '\| [0-9]+/450' eval.log   # peaks then resets, once per episode
 ```
 
-The 10/10 run gave `[398, 246, 255, 268, 317, 239, 223, 228, 300, 222]` with zero episodes
-reaching 450. A broken serving path instead gives clean 450-step timeouts. A run whose
-episodes all end after a handful of steps is neither — it is an environment fault.
+A healthy run mixes early terminations with 450s, for example
+`[240, 255, 236, 268, 320, 240, 450, 232, 300, 450, ...]` — successes land between step 205
+and 444. Cross-check that successes equal the episode count minus the number of 450s; if
+they do not, the tally is not measuring what you think. A broken serving path gives *only*
+clean 450-step timeouts. A run whose episodes all end after a handful of steps is neither —
+it is an environment fault.
 
 Note the client writes progress with `tqdm` carriage returns, so `grep -a` is required and a
 redirected log holds one very long line per episode.

@@ -219,9 +219,45 @@ When a guide states an expected success rate, treat every value in it as load-be
 - **Scrutinize a result above the published band as hard as one below it.** Confirm the success
   signal fired for the documented reason, and check whether you selected the benchmark's easiest
   variant: a guide quoting a range often quotes it for the randomized variant, not the fixed one.
+  A result above the band is more often too few episodes than a genuinely better run: one
+  10-episode evaluation scored 10/10 and read as "100%" for a policy whose rate over 150
+  episodes was 69.3%.
 
 Verify the *shape* of the result, not only the tally. Where success is a termination condition
 and failure is a step-limit timeout, extract the step at which each episode ended. Every episode
 ending well short of the cap is the success condition firing; uniform step-limit timeouts are a
 broken serving path; episodes ending after a handful of steps are an environment fault. All three
 report as a percentage and only the middle one is ambiguous from the percentage alone.
+
+
+## Fixing the seed does not make a policy evaluation deterministic
+
+An evaluation client typically seeds the environment, `random`, `numpy` and `torch` from one
+`--seed`. That fixes the *initial conditions* and nothing else. A policy served over a socket
+runs in another process the client's seed never reaches, and a diffusion-based action head
+samples every chunk, so the same seed against the same checkpoint gives a different rollout.
+
+Three 50-episode runs at an identical seed and checkpoint scored 68%, 74% and 66% — an 8-point
+spread with byte-identical starting states. Budget roughly +/-4 points of run-to-run noise at
+n=50 before attributing any difference to a change you made.
+
+Consequences worth internalising:
+
+- **Do not quote a result from 10 episodes.** The interval is far wider than the differences
+  usually being argued about. Quote 50 or more and state the count next to the rate.
+- **Repeat the run rather than re-seeding it.** Independent repeats measure the sampling noise
+  you actually face; seed-matching hides it.
+- **Pool before concluding.** Report the pooled rate with a binomial confidence interval
+  (Wilson, not normal-approximation, at these sample sizes) rather than the best or the most
+  recent run.
+
+## Collect more episodes by running pairs in parallel, not one longer evaluation
+
+Episodes are sequential inside one client, and a ZMQ `REQ`/`REP` policy server handles one
+client at a time — several clients pointed at one server stall until they time out. So the way
+to triple an episode count without tripling wall-clock is three independent server+client
+pairs, one server each.
+
+Three pairs on 6 GPUs collected 150 episodes in the wall time of 50. Give each client its own
+server, and verify each pair's success count equals its episode count minus its timeout count
+before pooling: that arithmetic check catches a pair that silently lost its server.
