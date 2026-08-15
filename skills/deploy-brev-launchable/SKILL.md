@@ -20,6 +20,8 @@ mistaken for readiness, and an SSH path that cannot work.
   deletes the instance.
 - Record the existing instances with `brev ls --all` and treat every one of them as
   out of scope. Never stop, start, reset, or delete an instance this task did not create.
+  Use `--all`, not plain `brev ls`, which returns only your own instances and so can
+  report an empty org that is in fact running billed GPU instances.
 - Prefix instance names so yours are identifiable, and confirm the cost before creating
   anything. A GPU instance keeps billing whether or not anyone is watching it.
 - Record `git status --short`; never change the Git index unless explicitly requested.

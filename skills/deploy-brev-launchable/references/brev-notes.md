@@ -91,6 +91,30 @@ it gives up. The failure looks like a service that never started.
   creating it. Refreshing before creation silently leaves no host entry, and every later
   `ssh` fails with `Could not resolve hostname`.
 
+## Instance Visibility Is Org-Scoped, and `brev ls` Hides Teammates
+
+Everything in Brev is scoped to an organization, and the two list forms differ in *whose*
+instances they return within that org:
+
+- `brev ls` returns only the instances owned by the logged-in user.
+- `brev ls --all` returns every instance in the org, teammates' included, plus external
+  nodes. `brev ls nodes` returns the external nodes alone.
+
+So `brev ls` printing `No instances in org <ORG>` does not mean the org is empty — it can
+still hold running, billing GPU instances that only `--all` reveals. Always take the
+pre-deploy inventory with `brev ls --all`, and confirm a deletion the same way.
+
+Ownership is decided by the logged-in identity, not by the org name, so instances created
+under a different identity in your own org (an agent or token session versus an
+interactive login) appear only under `--all`. The `--json` payload carries no owner field
+to distinguish them; check the console at <https://brev.nvidia.com> when attribution
+matters.
+
+`brev ls orgs` lists the orgs you belong to. Visibility never crosses them: there is no
+"all my instances everywhere" view, so switch with `brev org set <ORG>` or query one
+inline with `brev ls --all -o <ORG>`. Seeing an instance is also not access to it —
+SSH into a teammate's node requires the owner to run `brev grant-ssh`.
+
 ## Other Brev CLI Behavior
 
 - `brev ls --json` wraps its array as `{"workspaces": [...]}` and exposes `build_status`,
