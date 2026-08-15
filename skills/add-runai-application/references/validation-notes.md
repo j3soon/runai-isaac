@@ -174,3 +174,54 @@ downgrade. Fix every reference, not the first one found — in that release the 
 both `isaaclab_assets/robots/franka.py` and
 `isaaclab_tasks/direct/franka_cabinet/franka_cabinet_env_cfg.py`, so patching only the shared robot
 config still leaves a broken task.
+
+## Validate an evaluation harness with a published checkpoint before trusting any number
+
+A 0% closed-loop success rate is the same observation for "the model did not learn" and "the
+serving path is wrong", and a healthy training-loss curve does not separate them. Run a
+**published checkpoint for the same task** through the same harness first, and only trust the
+harness once it reproduces that checkpoint's reported number.
+
+Two rounds of evaluation on a custom policy were spent measuring a broken evaluation
+configuration, not a policy. The reference run that exposed it cost one job and about an hour.
+
+Gate offline before spending episodes: feed recorded dataset observations to the served policy
+and compare the predicted action chunk against the recorded actions, normalized by each
+dimension's spread in the data (`mean |err| / std`). Below ~0.6 means the policy is genuinely
+predicting; above ~1.0 means it is no better than the dataset mean, which is a serving fault
+rather than a training one. That check takes minutes and catches contract mismatches that cost
+hundreds of episodes to find closed-loop.
+
+Establish a floor as well. A trained policy's 0/30 only means something next to a random policy
+and a hold-position policy that also score 0/30, and partial-credit counters — grasps, contacts —
+separate "fails at the end" from "never starts": one random baseline grasped the object 12 times
+in 30 episodes while never completing the task.
+
+## Reproduce a published result with the published settings, including the exact model repo
+
+When a guide states an expected success rate, treat every value in it as load-bearing.
+
+- **Check the checkpoint's identity, not just its task.** Published finetunes of one task are
+  often released as sibling repositories whose names differ only by a suffix, where one is
+  trained in simulation only and the other mixes in real-robot episodes and trades simulation
+  score for transfer. Serving the wrong sibling scored 5/10 where the documented one scored
+  10/10 under otherwise identical settings. Copy the model path from the guide
+  character-for-character.
+- **Do not add flags the guide omits.** Client defaults are part of the published result — the
+  episode count and the seed especially. Setting them silently changes what "the published
+  number" means. Equally, a flag you add may be redundant rather than wrong: check the server's
+  own defaults before assuming you must pass one.
+- **Read the observation contract out of the checkpoint**, not out of the client's defaults.
+  A checkpoint's `experiment_cfg/conf.yaml` names the camera keys, the state keys and the action
+  horizon it expects. A key that does not match fails loudly; a key that matches but is
+  **swapped** produces no error and a quietly worse score — an inverted camera map plus the
+  client's default prompt cost 13 points against the same checkpoint.
+- **Scrutinize a result above the published band as hard as one below it.** Confirm the success
+  signal fired for the documented reason, and check whether you selected the benchmark's easiest
+  variant: a guide quoting a range often quotes it for the randomized variant, not the fixed one.
+
+Verify the *shape* of the result, not only the tally. Where success is a termination condition
+and failure is a step-limit timeout, extract the step at which each episode ended. Every episode
+ending well short of the cap is the success condition firing; uniform step-limit timeouts are a
+broken serving path; episodes ending after a handful of steps are an environment fault. All three
+report as a percentage and only the middle one is ambiguous from the percentage alone.

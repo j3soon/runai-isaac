@@ -15,6 +15,7 @@ Run:ai UI.
 | --- | --- | --- |
 | [RoboLab](../docker/robolab/README.md) `policies/cosmos3/run.py` | [Cosmos 3](../docker/cosmos3/README.md) `action_policy_server_robolab` | OpenPI WebSocket |
 | [RoboLab](../docker/robolab/README.md) `policies/gr00t/run.py` | [Isaac GR00T N1.7](../docker/isaac-gr00t-n1.7/README.md) `run_gr00t_server.py` | GR00T ZMQ |
+| [Sim-to-Real SO-101](../docker/sim-to-real-so101-workshop/README.md) `lerobot_eval` | GR00T-protocol server | GR00T ZMQ |
 
 ## How they communicate
 
@@ -39,7 +40,7 @@ Server accessible at: ws://192.168.32.185:8000/
 
 ### GR00T ZMQ
 
-Used by the RoboLab GR00T client.
+Used by the RoboLab GR00T client and by the SO-101 workshop's `lerobot_eval`.
 
 - Transport: ZeroMQ `REQ`/`REP` on `tcp://<host>:5555`
 - Serialization: msgpack, with ndarrays encoded as
@@ -54,6 +55,17 @@ Used by the RoboLab GR00T client.
 Because it is `REQ`/`REP`, the socket must stay strictly request-then-reply. A server that
 raises without sending a reply wedges the socket, so always answer — with an error payload
 if necessary.
+
+`REQ`/`REP` also means the server handles **one client at a time**, with no queueing across
+connections. Pointing several evaluation clients at a single server does not fan out; the
+first proceeds and the rest sit until they time out. Observed with five concurrent clients
+on one server: all five failed. Scale out by running one server per client, not one shared
+server.
+
+The server also reports its expected inputs, so read them rather than guessing:
+`get_modality_config` over the wire, or `experiment_cfg/conf.yaml` in the checkpoint. A
+client whose camera names do not match gets `RuntimeError: Server error: '<key>'`; a client
+whose names match but are **swapped** gets no error at all and a quietly worse score.
 
 ### Cosmos 3 HTTP
 

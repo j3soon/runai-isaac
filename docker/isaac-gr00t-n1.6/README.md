@@ -84,3 +84,48 @@ gr00t/eval/sim/robocasa-gr1-tabletop-tasks/robocasa_uv/.venv/bin/python gr00t/ev
     --n_action_steps 8 \
     --n_envs 5
 ```
+
+### Serving a Finetuned Checkpoint
+
+`run_gr00t_server.py` also serves a community finetune, which is how the SO-101 vial-to-rack
+policy is evaluated against the
+[Sim-to-Real SO-101 Workshop](../sim-to-real-so101-workshop/README.md) client:
+
+```sh
+cd /workspace/gr00t
+uv run python gr00t/eval/run_gr00t_server.py --model-path <local-checkpoint-dir>
+```
+
+`--model-path` is the only flag needed for such a checkpoint, because `ServerConfig` already
+defaults `embodiment_tag` to `NEW_EMBODIMENT`, `host` to `0.0.0.0` and `port` to `5555`.
+
+The image already contains the repository at `/workspace/gr00t` (upstream `NVIDIA/Isaac-GR00T`
+at the pinned commit in the Dockerfile, with `uv sync && uv pip install -e .` run at build
+time), so serving needs **no clone at all**. The `git clone --recurse-submodules` in the
+quick-start above is for the RoboCasa evaluation path: those submodules are LIBERO,
+SimplerEnv, robocasa and ManiSkill2_real2sim, they take over 40 minutes to check out onto an
+NFS mount, and `run_gr00t_server.py` imports none of them. Cloning to serve is the single
+biggest avoidable delay in bringing a policy server up.
+
+CLI details that cost time:
+
+- `--embodiment-tag` is a `tyro` enum and takes the **uppercase** member name, so
+  `NEW_EMBODIMENT`, not the `new_embodiment` string that appears in checkpoint metadata. It
+  is also already the default, so a `new_embodiment` checkpoint needs no flag.
+- Only `--model-path` is required. Its value is the **checkpoint directory**
+  (`.../checkpoint-10000`), not the repo root; a published finetune usually carries a
+  self-contained copy of `config.json`, the safetensors shards, `processor_config.json`,
+  `statistics.json`, `embodiment_id.json` and `experiment_cfg/` inside each checkpoint, so
+  `--include 'checkpoint-N/*'` is the whole download.
+- The startup banner echoes the resolved `Embodiment tag`, `Model path`, `Host` and `Port`.
+  Read it instead of assuming the defaults took effect.
+- `tyro` booleans are bare flags. `--use-state True` fails with
+  `Unrecognized options: True`; write `--use-state`, and omit the flag for false.
+- The checkpoint declares the observation contract it expects. Read
+  `<checkpoint>/experiment_cfg/conf.yaml` for `video.modality_keys` (the camera names the
+  client must send) and `action.delta_indices` (the action horizon) instead of guessing.
+- The server is ZMQ `REQ`/`REP` and serves one client at a time. See
+  [Policy Server and Client Workloads](../../docs/policy-server-client.md).
+
+Downloading the checkpoint to the NFS mount rather than the pod keeps it across the restarts
+that the idle-GPU timeout causes.
