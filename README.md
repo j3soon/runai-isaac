@@ -33,6 +33,7 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 | [j3soon/runai-isaac-lab-ex:2.1.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.2.0](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:2.3.2](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex) | [Isaac Lab (Extended) Interactive Workspace](./docker/isaac-lab-ex/README.md) |
 | [j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex)<br>[j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy](https://hub.docker.com/r/j3soon/runai-isaac-lab-ex) | [Isaac Lab (Extended) with ROS 2](./docker/isaac-lab-ex-ros2/README.md) |
 | [j3soon/runai-isaac-lab-arena:0.2.1](https://hub.docker.com/r/j3soon/runai-isaac-lab-arena) | [Isaac Lab Arena](./docker/isaac-lab-arena/README.md) |
+| [j3soon/runai-isaac-lab-mimic:3.0.0-beta2.patch1](https://hub.docker.com/r/j3soon/runai-isaac-lab-mimic) | [Isaac Lab Mimic and SkillGen](./docker/isaac-lab-mimic/README.md) |
 | [j3soon/runai-robolab:0.3.0](https://hub.docker.com/r/j3soon/runai-robolab) | [RoboLab](./docker/robolab/README.md) |
 | [j3soon/runai-cosmos-predict1](https://hub.docker.com/r/j3soon/runai-cosmos-predict1) | [Cosmos-Predict1](./docker/cosmos-predict1/README.md) |
 | [j3soon/runai-cosmos-predict:2.5](https://hub.docker.com/r/j3soon/runai-cosmos-predict) | [Cosmos-Predict2.5](./docker/cosmos-predict2.5/README.md) |

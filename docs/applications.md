@@ -15,6 +15,7 @@ Please note that interactive workloads are only for debugging, and should be sto
 - [Isaac Lab (Extended) Interactive Workspace](../docker/isaac-lab-ex/README.md)
 - [Isaac Lab (Extended) with ROS 2](../docker/isaac-lab-ex-ros2/README.md)
 - [Isaac Lab Arena](../docker/isaac-lab-arena/README.md)
+- [Isaac Lab Mimic and SkillGen](../docker/isaac-lab-mimic/README.md)
 - [RoboLab](../docker/robolab/README.md)
 - [Isaac GR00T N1](../docker/isaac-gr00t-n1/README.md)
 - [Isaac GR00T N1.5](../docker/isaac-gr00t-n1.5/README.md)

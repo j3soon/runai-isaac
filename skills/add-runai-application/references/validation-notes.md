@@ -3,7 +3,7 @@
 Pitfalls found while building and validating Docker-backed applications in this repository. Each
 one produced a wrong conclusion at least once, so check against it before reporting a result.
 
-## Capture simulator video in-app, not by screen capture
+## Capture simulator video and screenshots in-app, not by screen capture
 
 `ffmpeg -f x11grab` records solid black for an Isaac Sim window, even when the GUI is mapped and
 rendering correctly.
@@ -11,6 +11,13 @@ rendering correctly.
 Isaac Sim presents its viewport through a Vulkan swapchain, while `x11grab` reads via `XGetImage`
 on the root window, which cannot see that surface under a compositing desktop. `xwd -root` is black
 for the same reason, so this is not a window-geometry or offset mistake.
+
+**Stills are affected identically.** Reach for this note whenever a screenshot comes back black,
+blank, or as a zero-byte PNG — `xwd -root`, `xwd -id <window-id>`, `import`, and piping any of them
+through `convert` all read the same X surface and hit the same wall, whether run on the host or
+from a throwaway container sharing `/tmp/.X11-unix`. `xwininfo` reporting a correctly sized, mapped
+window is not evidence that a capture of it will contain pixels. Confirming a GUI *exists* via
+`xwininfo` is fine; do not spend attempts trying to photograph it.
 
 Use the application's own recorder instead: it is headless, higher quality, and needs no X server.
 RoboLab's `examples/run_gripper_toggle.py --headless` and its policy runners write per-episode
@@ -97,3 +104,51 @@ Read per-run figures from the structured output the tool writes (RoboLab's `timi
 `episode_results.jsonl`), not from log lines: the first inference includes compilation and is not
 representative. Let the GPU warm up before timing anything, and benchmark with representative
 input — synthetic all-zero frames are the cheapest case and understate real camera input.
+
+## Clear the Isaac Sim entrypoint before documenting a local `docker run`
+
+`nvcr.io/nvidia/isaac-sim` and `nvcr.io/nvidia/isaac-lab` set an `ENTRYPOINT`
+(`/isaac-sim/runheadless.sh`), so a local `docker run <image> /run.sh "<command>"` **appends** the
+whole pipeline to the Kit command line instead of executing it. Kit ignores the unknown arguments,
+starts the streaming app, and idles forever — no error, no output from the intended command, and
+`docker ps` shows a healthy container. One run sat like this for 19 minutes before the cause was
+found.
+
+Run:ai hides the problem, because `--command` maps to the Kubernetes `command:` field, which
+overrides `ENTRYPOINT`. An image validated only on Run:ai can therefore ship local instructions
+that silently do nothing.
+
+Add `ENTRYPOINT []` and `CMD ["/bin/bash"]` to any Isaac-derived image whose guide documents a
+local `docker run`; see `docker/isaac-lab-arena/Dockerfile_0_2_1` and
+`docker/isaac-lab-mimic/Dockerfile_3_0_0_beta2_patch1`. To recognize it, check `ps` inside the
+container: the intended command appears as trailing arguments of `/isaac-sim/kit/kit ... .kit`
+rather than as its own process.
+
+## Verify Nucleus asset paths against the image's asset generation
+
+Isaac Lab resolves cloud assets against `persistent.isaac.asset_root.cloud` in
+`apps/isaaclab.python.kit` — `.../Assets/Isaac/6.0` in Isaac Lab 3.0.0-beta2.patch1. The Python
+constants `ISAAC_NUCLEUS_DIR` and `ISAACLAB_NUCLEUS_DIR` are derived from that file at import time,
+so a Kit `--/persistent/...` override does not change them.
+
+Asset layouts move between generations while the code keeps the old relative path. Isaac Lab
+3.0.0-beta2.patch1 requests `Robots/FrankaEmika/panda_instanceable.usd`, which exists under `5.0`
+and `5.1` but moved to `Robots/FrankaEmika/Legacy/` in `6.0`, so every environment spawning the
+Franka from that path — all of the Mimic and SkillGen stacking tasks — aborts at scene construction
+with `FileNotFoundError: USD file not found at path`. This reads like a network or permissions
+problem and is not one.
+
+Enumerate what the tasks actually request, then `HEAD`-check each path:
+
+```bash
+grep -rhoE "\{ISAACLAB_NUCLEUS_DIR\}/[A-Za-z0-9_./-]+|\{ISAAC_NUCLEUS_DIR\}/[A-Za-z0-9_./-]+" \
+  <task directory> | sort -u
+curl -sI -o /dev/null -w '%{http_code}\n' "<asset root>/<relative path>"
+```
+
+Compare `content-length` and `etag` between generations before repointing anything; a matching pair
+means the asset only moved, so a `sed` in the Dockerfile is a safe fix rather than a version
+downgrade. Fix every reference, not the first one found — in that release the stale path appears in
+both `isaaclab_assets/robots/franka.py` and
+`isaaclab_tasks/direct/franka_cabinet/franka_cabinet_env_cfg.py`, so patching only the shared robot
+config still leaves a broken task.

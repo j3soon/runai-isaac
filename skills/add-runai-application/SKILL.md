@@ -61,7 +61,7 @@ Build a complete application integration that follows the repository's current s
 
 ## 7. Validate and hand off
 
-- Read `references/validation-notes.md` first. It records pitfalls that have each produced a wrong conclusion before: black screen-capture video, buffered server readiness banners, token handling for gated checkpoints, and single-episode benchmark claims.
+- Read `references/validation-notes.md` first. It records pitfalls that have each produced a wrong conclusion before: black screen-capture video, buffered server readiness banners, token handling for gated checkpoints, single-episode benchmark claims, an Isaac base-image entrypoint that silently swallows the documented local command, and Nucleus asset paths that move between asset generations.
 
 - Build the exact Dockerfile from the repository root with its documented tag.
 - Run a targeted container smoke test that exercises the real entrypoint or documented command. For distributed images, test rendezvous and rank behavior with multiple containers when feasible.

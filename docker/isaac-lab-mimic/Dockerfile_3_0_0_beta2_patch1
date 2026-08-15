@@ -1,0 +1,92 @@
+# Upstream: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-lab
+FROM nvcr.io/nvidia/isaac-lab:3.0.0-beta2-post1
+
+LABEL org.opencontainers.image.version="3.0.0-beta2.patch1"
+
+ENV ACCEPT_EULA=Y
+ENV SHELL=/bin/bash
+
+USER root
+
+# =====CUDA Toolkit=====
+# The base image ships no `nvcc`, but cuRobo compiles CUDA extensions from source.
+# The toolkit minor version must stay aligned with the bundled PyTorch build
+# (2.10.0+cu128), so it is spelled out here rather than parameterized -- the apt package
+# suffix (`12-8`) and the install directory (`cuda-12.8`) have to move together.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget \
+    && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && rm cuda-keyring_1.1-1_all.deb \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        cuda-nvcc-12-8 \
+        cuda-cudart-dev-12-8 \
+        cuda-nvrtc-dev-12-8 \
+        cuda-cccl-12-8 \
+        libcublas-dev-12-8 \
+        libcurand-dev-12-8 \
+        libcusolver-dev-12-8 \
+        libcusparse-dev-12-8 \
+    && rm -rf /var/lib/apt/lists/*
+ENV CUDA_HOME=/usr/local/cuda-12.8
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+
+# =====SkillGen (cuRobo)=====
+# Isaac Lab already ships the SkillGen planner (`isaaclab_mimic.motion_planners.curobo`),
+# but not the cuRobo package it imports, so `generate_dataset.py --use_skillgen` fails
+# without this layer. The commit is the revision Isaac Lab's SkillGen guide is tested
+# against; other revisions are reported to be incompatible.
+# Ref: https://isaac-sim.github.io/IsaacLab/main/source/overview/imitation-learning/skillgen.html
+ARG CUROBO_COMMIT=ebb71702f3f70e767f40fd8e050674af0288abe8
+# L40/L40S (8.9), H100 (9.0), and RTX PRO 6000 Blackwell (12.0). Override with a single
+# architecture to cut build time when the image targets one GPU model.
+ARG TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0+PTX"
+# Bound the nvcc fan-out; the default one-job-per-core easily exhausts RAM on a workstation.
+ARG MAX_JOBS=8
+RUN mkdir -p /opt/curobo && cd /opt/curobo \
+    && git init -q \
+    && git remote add origin https://github.com/NVlabs/curobo.git \
+    && git fetch -q --depth 1 origin ${CUROBO_COMMIT} \
+    && git checkout -q FETCH_HEAD \
+    && TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" MAX_JOBS="${MAX_JOBS}" \
+       /workspace/isaaclab/_isaac_sim/python.sh -m pip install --no-cache-dir \
+       --no-build-isolation -e /opt/curobo \
+    && rm -rf /root/.cache/pip
+
+# Upstream additionally asks for `robomimic` and `rerun-sdk`; the base image already
+# bundles those plus `pinocchio` (robomimic 0.4.0, rerun-sdk 0.34.1, pin 4.1.0), so no
+# extra layer is needed.
+
+# =====Franka asset path fix=====
+# Local fix: Isaac Lab 3.0.0-beta2.patch1 resolves assets against
+# `.../Assets/Isaac/6.0`, but `Robots/FrankaEmika/panda_instanceable.usd` moved into a
+# `Legacy/` subdirectory in that asset generation, so every environment spawning the Franka
+# from that path -- including all of the Mimic and SkillGen stacking tasks -- aborts with
+# `FileNotFoundError: USD file not found`. The moved file is byte-identical to the 5.1
+# asset (same 8038-byte size and S3 ETag). Rewrite every reference under `source/` rather
+# than just `isaaclab_assets/robots/franka.py`, since `franka_cabinet_env_cfg.py` carries
+# the same stale path. Re-check on the next release; upstream `main` is still unfixed.
+RUN cd /workspace/isaaclab/source \
+    && FILES=$(grep -rl 'Robots/FrankaEmika/panda_instanceable\.usd' . || true) \
+    && { [ -n "$FILES" ] || { echo "ERROR: stale Franka asset path not found; upstream may have fixed it -- drop this layer"; exit 1; }; } \
+    && echo "$FILES" | xargs sed -i 's|Robots/FrankaEmika/panda_instanceable.usd|Robots/FrankaEmika/Legacy/panda_instanceable.usd|g' \
+    && { [ -z "$(grep -rl 'Robots/FrankaEmika/panda_instanceable\.usd' . || true)" ] || { echo "ERROR: stale Franka asset path survived the rewrite"; exit 1; }; }
+
+# Tools and scripts for Omniverse
+COPY --chown=isaaclab:isaaclab thirdparty/omnicli /omnicli
+COPY --chown=isaaclab:isaaclab scripts/docker/run.sh /run.sh
+
+# Prevent users from accidentally removing the executable permission.
+RUN chmod +x /omnicli/omnicli && chmod +x /run.sh
+# Prevent users from accidentally saving script files with Windows line endings.
+RUN sed -i 's/\r$//' /run.sh
+
+# The base image entrypoint is `/isaac-sim/runheadless.sh`, which would consume the workload
+# command as its own arguments. Clear it so the Run:ai command (`/run.sh "..."`) and local
+# `docker run` commands are executed directly. Without this, a local
+# `docker run <image> /run.sh "..."` silently starts the Isaac Sim streaming app instead and
+# idles forever, because the pipeline command is appended to the Kit command line.
+ENTRYPOINT []
+
+CMD ["/bin/bash"]
+
+USER isaaclab
