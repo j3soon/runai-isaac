@@ -152,6 +152,10 @@ calls can. `POST /api/organizations/<ORG>/workspaces` on
   with `400 Legacy workspace version unsupported`, which reads like a client-version
   problem rather than a missing field.
 - `portMappings` is a *name to port* map, and it is what opens the application ports.
+- `cloudCredId` is per provider and must match the instance type's cloud:
+  `devplane-brev-1-credential` for AWS, `brev-gcp-test` for GCP. Pairing a GCP type with
+  the AWS cred fails as `500 … rpc error: NotFound desc = instance type <type> not found`,
+  which points at the type rather than the real cause.
 - Do not hand-write this payload from guesswork. Point `BREV_API_URL` at a local HTTP
   server and run the real `brev create`: the CLI honors the variable, so the exact request
   body lands in your log and nothing reaches Brev. Forward `GET`s to the real host so the
@@ -161,21 +165,36 @@ calls can. `POST /api/organizations/<ORG>/workspaces` on
 - A deleted instance holds its name until deletion finishes; reusing it immediately fails
   with `400 duplicate workspace with name <NAME>`.
 
-What the API will *not* do is attach the setup script. Both `startupScript` and an inline
-`vmBuild.lifeCycleScriptAttr.script` are silently dropped on `workspaceVersion: v1` — the
-instance boots with all three cloud-init parts (`always.sh`, `instance.sh`, `once.sh`)
-empty. A Launchable works because its script is a registered object referenced by id
-(`ls-…`), which the CLI fetches from `/api/launchable/lifecycle-script` before creating.
-Verify by decoding `environment.provision.Directive.CreateInstanceRequest.user_data_base64`
-rather than trusting the create response, which echoes neither field.
+The setup script attaches at create time too — put it in
+`vmBuild.lifeCycleScriptAttr.script` as inline text:
 
-Without a Launchable, apply the script over SSH once the relay is up. It ends in a
-scheduled reboot, so detach it (`setsid nohup … &`) or the reboot kills the run:
+```json
+{"vmBuild":{"forceJupyterInstall":false,
+            "lifeCycleScriptAttr":{"script":"#!/bin/bash\n…"}}}
+```
+
+No registered script id is needed. `brev create --startup-script @file` sends exactly this
+field with no id and no separate registration call, and the server assigns the `ls-…` id
+itself. The top-level `startupScript` field is the one to avoid: the CLI always sends it
+empty, and a create that puts the script there gets it echoed back as `""`.
+
+**Do not verify this through cloud-init.** `user_data_base64` in the provision directive
+holds only the three empty cloud-init stubs (`always.sh`, `instance.sh`, `once.sh`) whether
+or not a script attached — reading its emptiness as "the script was dropped" is wrong, and
+cost a full redeploy here. Brev delivers the script out of band, and the evidence is on the
+instance:
 
 ```bash
-scp docker/isaac-lab-ex-ros2/brev_setup_2_3_2_ros2_jazzy.sh <INSTANCE>:/tmp/setup.sh
-ssh <INSTANCE> 'chmod +x /tmp/setup.sh; setsid nohup /tmp/setup.sh >/tmp/setup.out 2>&1 </dev/null &'
+ls /opt/oncreate_lifecycle_script_*.sh        # the script Brev wrote and ran
+ls ~/.lifecycle-script-ls-*.log               # its transcript, named with the assigned id
 ```
+
+Timing matters when checking: the agent runs the script a couple of minutes *after* the
+instance reports `RUNNING`, and later than `ssh_access` appears. A check at ~220s found
+nothing; the same check at ~3 minutes of uptime found the script complete. Do not conclude
+"no script" from one early look, and do not start applying it by hand — the Launchable-free
+create in this repository's testing had its script running all along, so a manual `setsid
+nohup` run raced Brev's own copy of the same script.
 
 Measured end to end on `g6e.xlarge` with a 256GiB disk: `installing-driver` ~1 min,
 `pulling-image` ~6 min, `rebooting` ~22 min, `ready` with the container up at ~24 min —

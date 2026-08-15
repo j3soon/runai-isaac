@@ -40,15 +40,17 @@ mistaken for readiness, and an SSH path that cannot work.
 
 - Deploy as a Launchable: `brev create <name> --launchable <id>`. The Launchable carries
   the instance type, disk size, and setup script.
-- Do not substitute `brev create --startup-script`. `brev create` has no disk-size flag
-  (`--min-disk` only filters which types are considered), and on `workspaceVersion: v1`
-  the setup script does not attach at all, so the instance boots bare.
+- `brev create --startup-script` does run the script, but it cannot set the disk size or
+  the port mappings, so it is not a substitute for a Launchable on its own.
 - Use `--dry-run` to confirm the resolved instance type and storage for free before
   spending anything. It prints the Launchable's storage; for a plain create it prints only
   the type.
-- If a deployment genuinely must avoid the Launchable, drive the API directly rather than
-  the `create` flags, and expect to apply the setup script over SSH afterwards. See
-  "Creating an Instance Without a Launchable" in [references/brev-notes.md](references/brev-notes.md).
+- If a deployment genuinely must avoid the Launchable, drive the API directly, which does
+  carry disk, ports, and setup script together. See "Creating an Instance Without a
+  Launchable" in [references/brev-notes.md](references/brev-notes.md).
+- Give the setup script time before judging it: Brev runs it a couple of minutes after the
+  instance reports `RUNNING`. Never re-run it by hand on a suspicion, or the manual copy
+  races the one Brev is already running.
 - Editing the repository's setup script does not change an existing Launchable. The
   Launchable holds its own copy, so a script change must be pasted into the console
   before it can be tested.
