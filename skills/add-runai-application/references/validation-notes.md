@@ -90,6 +90,28 @@ run is interrupted, what survives is decided by the framework's save interval �
 `agent.save_interval` defaults to 200 iterations — not by where you stopped, so check that interval
 before relying on an early stop.
 
+## Measure whether a model repo is gated; do not assume it from the family
+
+Assuming a Hugging Face token is required, and building a whole credential-staging step around it,
+wastes time when the artifact is already public. Measured 2026-08-04 with
+`curl -o /dev/null -w '%{http_code}'` against `/resolve/main/config.json`, where 307/200 means
+reachable and 401/403 means gated:
+
+| repo | unauthenticated |
+| --- | --- |
+| `nvidia/Cosmos3-Nano-Policy-DROID` | 307 |
+| `nvidia/GR00T-N1.7-DROID` | 307 |
+| `Qwen/Qwen3-VL-2B-Instruct` | 307 |
+| `nvidia/Cosmos-Reason2-2B` | **401** |
+
+So the RoboLab policy checkpoints for both Cosmos 3 and GR00T are public, and only
+`Cosmos-Reason2-2B` — GR00T N1.7's VLM backbone — is gated. `nvidia/Cosmos3-{Edge,Nano,Super}` and
+`nvidia/Cosmos-Guardrail1` (`gated: auto`) are also reachable unauthenticated.
+
+Run the one-line check yourself rather than trusting this table: gating is a point-in-time property
+the publisher can change in either direction. Where a token *is* needed, see the token-handling note
+above.
+
 ## Do not quote a benchmark from one episode
 
 Policy servers are often non-deterministic — the Cosmos 3 RoboLab server logs
