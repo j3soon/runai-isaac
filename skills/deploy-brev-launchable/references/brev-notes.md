@@ -77,6 +77,69 @@ instance. Measured on 4 vCPUs, running them concurrently stretched the driver in
 from ~12 to ~25 minutes and the pull from ~16 to ~30, for ~33 minutes total against ~30
 sequential. The DKMS build and the image decompression contend for the same cores.
 
+## Isaac Sim 5.1.0 Really Does Fail on the 595 Driver Branch
+
+This is why the setup scripts downgrade Brev's stock 595 to 580, and it is corroborated
+upstream rather than only locally:
+
+- [IsaacSim#537](https://github.com/isaac-sim/IsaacSim/issues/537) — driver 595.79 makes
+  Isaac Sim 5.1.0 (and 6.0) fail to detect the CUDA device and crash during RTX plugin
+  initialization. "Downgrading the NVIDIA driver to version 580 resolves the issue."
+- [Isaac Sim 5.1.0 requirements](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/requirements.html)
+  lists Linux **580.65.06** as the tested driver. Note it states no *maximum*, so the
+  incompatibility is a known-issue matter rather than something the requirements page rules out —
+  do not expect to find it documented there.
+
+So keep the downgrade, and treat "the docs don't forbid this driver" as weak evidence either way.
+
+## A Vulkan Failure Is the Image's Loader, Not the Host Driver
+
+`nvidia-smi` working is not evidence that a rendering workload will run, and a Vulkan failure
+is not evidence that the host driver is broken. Both were measured on `g6e.xlarge` (L40S) with
+the same setup script installing Ubuntu's `nvidia-driver-580` over Brev's stock 595, resolving
+to driver 580.178.04 on both instances:
+
+| image | base | `vulkaninfo` in container | Isaac Sim |
+| --- | --- | --- | --- |
+| `runai-hcis-lab-aicapstone` | `nvidia/cuda:12.8.1-devel-ubuntu22.04` | `ERROR_INCOMPATIBLE_DRIVER` | `Failed to create any GPU devices` |
+| `runai-isaac-lab-ex-ros2:2.3.2` | `ubuntu:24.04` | `deviceName = NVIDIA L40S` | `Graphics API: Vulkan`, camera env sets up |
+
+Same cloud, same instance type, same driver, same setup script. **Only the container's Vulkan
+loader differs**: Ubuntu 22.04 ships libvulkan1 ~1.3.204 (early 2022), which cannot load the
+580.178.04 ICD; Ubuntu 24.04's loader can. The symptom is
+`Could not get 'vkCreateInstance' via 'vk_icdGetInstanceProcAddr'`, which is the loader/ICD
+interface-version mismatch signature and reads misleadingly like a driver fault.
+
+That first row cost a wrong conclusion here. These were all checked and cleared before the
+comparison was run, so do not spend time on them: GL libraries are mounted,
+`NVIDIA_DRIVER_CAPABILITIES=all`, the ICD JSON is valid, `libGLX_nvidia.so.0` dlopens and
+exports `vk_icdGetInstanceProcAddr`, device nodes and kernel modules are present, and the GPU
+is Pass-Through with Compute Mode Default. Mounting the host's `/usr/share/vulkan/icd.d` and
+setting `VK_ICD_FILENAMES` change nothing.
+
+**Testing the host proves less than it looks.** `vulkaninfo` installed on the host from its own
+archive exercises *that* distribution's loader, so an old host userspace reproduces the same
+error and invites the same wrong conclusion. The decisive experiment is a second image with a
+newer base on the same instance — that isolates the loader from the driver in one run.
+
+So probe Vulkan per image, not per host, before trusting a rendering deployment:
+
+```sh
+sudo docker run --rm --gpus all <image> vulkaninfo --summary | grep -E "deviceName|ERROR"
+# working: deviceName = NVIDIA <model>;  broken: ERROR_INCOMPATIBLE_DRIVER, or only llvmpipe
+```
+
+One mitigation is worth trying before rebuilding an image, though it was **not** tested here:
+Kit verifies the driver version itself, and drivers above 535.255
+[report their version incorrectly through Vulkan](https://github.com/isaac-sim/IsaacLab/issues/3604),
+so Kit can misidentify a working driver as incompatible. That check can be disabled with
+`--/rtx/verifyDriverVersion/enabled=false`. It only helps when the loader can create an instance
+at all — where `vulkaninfo` in the same container already fails, as it did here, the problem is
+below Kit and this flag cannot fix it.
+
+A rendering failure of this kind also **hangs rather than exits**: the Kit process stayed alive
+20+ minutes after printing the error. Gate a watcher on a log marker, never on process exit.
+
 ## Reach the Instance Over Its SSH Relay, Not `brev exec`
 
 `brev exec` and `brev port-forward` both target port `22`, which is firewalled on AWS
@@ -229,6 +292,11 @@ and all were the watcher's fault rather than Brev's:
 - **`grep -c READY` also matches `NOT READY`.** That declared success in 30 seconds, so
   `brev refresh` ran before any relay existed and wrote no host entries at all. Match the
   delimited field (`grep -c '|READY$'`).
+- **`grep -c` prints `0` *and* exits non-zero on no-match**, so the common
+  `$(grep -ci "no space left" "$LOG" || echo 0)` guard emits `0\n0` on the healthy path. That
+  compares unequal to `0` and fires the abort condition immediately — a watcher that kills a
+  perfectly good deploy and reads as a real disk failure. Use
+  `grep -qi ... && echo NOSPACE` and test for the marker's presence rather than counting.
 - **Waiting on `status=RUNNING` never succeeds during setup.** Brev reports `UNHEALTHY`
   for most of a 2.3.2 deploy because its gpu-driver health check fails until the driver
   reboot. Gate on `shell_status=READY`, which is what tracks SSH availability.
@@ -252,6 +320,15 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BREV_API/api/workspaces/<ID>" \
 
 `lifecycle_status: terminating` with `terminate-environment-instance: succeeded` means the
 charge has stopped. Still confirm the row eventually disappears from `brev ls --all`.
+
+**A delete can fail and leave the row as `STOPPED`, which does not look like a failure.** One
+instance here went `DELETING` for several minutes, then reverted to `STOPPED` — reading as a
+deliberate stop rather than a delete that did not finish. The task list showed the real story:
+`terminate-environment-instance: succeeded` (so the machine and its hourly charge were gone)
+alongside `delete-environment: failed`, leaving the control-plane record and its disk. Re-issuing
+`brev delete` cleared it. So confirm deletion by absence from `brev ls --all`, and treat a
+`STOPPED` row you did not stop as an unfinished delete — a 256GiB volume still bills storage at
+roughly $0.10/GB/month even with the instance terminated.
 
 ## Other Brev CLI Behavior
 

@@ -261,3 +261,35 @@ pairs, one server each.
 Three pairs on 6 GPUs collected 150 episodes in the wall time of 50. Give each client its own
 server, and verify each pair's success count equals its episode count minus its timeout count
 before pooling: that arithmetic check catches a pair that silently lost its server.
+
+## A recorder's success tally is not a count of what reached disk
+
+A data-generation script prints its **state machine's** verdict on task completion, which is a
+different number from how many episodes the recorder actually exported. Validating a datagen image
+against the console tally therefore passes on an empty dataset.
+
+`HCIS-Lab/aicapstone`'s `scripts/datagen/generate.py` printed `[Data Usage]1/1 success.` and exited
+0 while writing a dataset with `total_episodes: 0` and no `data/` or `videos/` directory at all.
+The cause generalises beyond that repo: LeIsaac's `LeRobotRecorderManager.export_episodes()` flushes
+the episode buffer, Isaac Lab calls it only on **environment reset**, and the script's
+end-of-run branch returns before its `env.reset()`. So the last episode is never consolidated —
+`--num_demos N` yields `N-1` episodes, and `--num_demos 1` yields nothing.
+
+Check the artifact, never the log line:
+
+```bash
+python3 -c "import json;d=json.load(open('<dataset>/meta/info.json'));print(d['total_episodes'],d['total_frames'])"
+find <dataset> -name '*.parquet' -o -name '*.mp4' | head
+```
+
+Two symptoms identify this class of bug once you know to look:
+
+- A per-export progress line (here `Recorded N successful demonstrations.`) is **absent**, because
+  the exported counter never advanced past zero.
+- An orphaned staging directory holds the dropped episode's raw frames with no matching parquet row.
+  Frames on disk are evidence that recording *started*, not that a dataset was written.
+
+Run the smallest count that can distinguish the cases before a long run. Here `--num_demos 1` and
+`--num_demos 3` cost about four minutes together and pinned the off-by-one exactly; a single
+20-demo run would have produced 19 episodes and looked merely like the documented
+"only successful episodes are exported" behaviour.
