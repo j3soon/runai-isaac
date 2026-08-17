@@ -156,6 +156,10 @@ calls can. `POST /api/organizations/<ORG>/workspaces` on
   `devplane-brev-1-credential` for AWS, `brev-gcp-test` for GCP. Pairing a GCP type with
   the AWS cred fails as `500 … rpc error: NotFound desc = instance type <type> not found`,
   which points at the type rather than the real cause.
+- `diskStorage` cannot go below the base image's snapshot. On AWS that is 75GB, and a
+  smaller value fails the whole provision with `InvalidBlockDeviceMapping: Volume of size
+  <n>GB is smaller than snapshot …, expect size >= 75GB`. Provisioning failures bill
+  nothing, but they land in `FAILURE` rather than retrying.
 - Do not hand-write this payload from guesswork. Point `BREV_API_URL` at a local HTTP
   server and run the real `brev create`: the CLI honors the variable, so the exact request
   body lands in your log and nothing reaches Brev. Forward `GET`s to the real host so the
@@ -210,6 +214,28 @@ When comparing GPUs this way, match RAM and disk explicitly and check the archit
 Instance searches rank by GPU name, VRAM, and RAM, which lets an `arm64` type (AWS
 `g5g.*`, carrying a T4**g**) sit next to the `x86_64` type you want with everything else
 looking identical.
+
+## Test a Watcher Before Trusting It Unattended
+
+Three unattended watchers in one session each reported "still waiting" for 20-45 minutes
+while nothing was happening. None cost money beyond idle instances, all cost wall clock,
+and all were the watcher's fault rather than Brev's:
+
+- **Expired auth reads as "not ready".** A long poll against the REST API starts returning
+  `401` once the stored session expires, and a status parser turns that into "not ready
+  yet". Poll `brev ls --json` instead: the CLI refreshes its own token. If a script must
+  use the REST API, run any `brev` command first and re-read `~/.brev/credentials.json`,
+  because the CLI rewrites the token there.
+- **`grep -c READY` also matches `NOT READY`.** That declared success in 30 seconds, so
+  `brev refresh` ran before any relay existed and wrote no host entries at all. Match the
+  delimited field (`grep -c '|READY$'`).
+- **Waiting on `status=RUNNING` never succeeds during setup.** Brev reports `UNHEALTHY`
+  for most of a 2.3.2 deploy because its gpu-driver health check fails until the driver
+  reboot. Gate on `shell_status=READY`, which is what tracks SSH availability.
+
+Also give a watcher an abort condition, not only a success condition: check for `FAILURE`
+status and grep the setup log for `no space left`. A failed create otherwise looks exactly
+like a slow one for as long as the timeout allows.
 
 ## Deletion Reports `DELETING` Long After Billing Stops
 

@@ -82,16 +82,47 @@ The systemd unit retries until the GPU driver is ready, while Compose's `restart
 
 ### Verified Instance Types (2.3.2)
 
-The 2.3.2 setup script needs no per-GPU changes: driver branch 580 covers both Ada and Turing, and the same script resolved `580.178.04` on each. Measured with 256GiB disk and 32GB RAM, running all five service probes plus Isaac Sim init and a 3-iteration cartpole training:
+The 2.3.2 setup script needs no per-GPU changes: driver branch 580 covers Ada and Turing alike, and the same script resolved `580.178.04` on every instance below. Each row passed all five service probes plus Isaac Sim init and a 3-iteration cartpole training, on a 256GiB disk:
 
-| Instance | GPU | VRAM | RAM | $/hr | Setup to `ready` | Cartpole fps |
-|----------|-----|------|-----|------|------------------|--------------|
-| `g6e.xlarge` | L40S | 46068 MiB | 32GiB | $2.23 | ~23 min | 158331 |
-| `g4dn.2xlarge` | T4 | 15360 MiB | 32GiB | $0.90 | ~22 min | 119075 |
+**Prefer AWS.** It is the most exercised path here, and the recommended instance per GPU is the cheapest AWS row below: `g4dn.xlarge` for T4, `g6.xlarge` for L4, `g6e.xlarge` for L40S. Other clouds are recorded for reference, not as recommendations.
 
-The T4 reaches about 75% of L40S throughput at roughly 40% of the cost, and 15GB of VRAM is ample for cartpole — a heavier scene may not fit. Treat small throughput differences as noise: two `g6e.xlarge` runs of the same image differed by ~6% (158331 and 168972).
+Sorted by price:
+
+| Instance | Cloud | GPU (VRAM) | vCPU | RAM | $/hr | Setup to `ready` | Peak RAM | Cartpole fps |
+|----------|-------|------------|------|-----|------|------------------|----------|--------------|
+| `n1-standard-2:nvidia-tesla-t4:1` | GCP | T4 (16GB) | 2 | 8GiB | $0.53 | ~12 min | 3682 MiB | 61963 |
+| `g4dn.xlarge` | AWS | T4 (16GB) | 4 | 16GiB | $0.63 | ~9 min | 3694 MiB | 130447 |
+| `g2-standard-4:nvidia-l4:1` | GCP | L4 (24GB) | 4 | 16GiB | $0.85 | ~8 min | 3958 MiB | 106217 |
+| `g4dn.2xlarge` | AWS | T4 (16GB) | 8 | 32GiB | $0.90 | ~22 min | not measured | 119075 |
+| `g6.xlarge` | AWS | L4 (22GB) | 4 | 16GiB | $0.97 | ~7 min | 3974 MiB | 159029 |
+| `massedcompute_L40S` | shadeform | L40S (48GB) | 12 | 72GiB | $1.06 | ~4 min | 11034 MiB | 260593 |
+| `g6e.xlarge` | AWS | L40S (45GB) | 4 | 32GiB | $2.23 | ~14-23 min | 3902 MiB | 152642 |
+
+VRAM is the size Brev's instance search reports; `nvidia-smi` shows slightly less usable memory (for example 15360 MiB on the T4, 46068 MiB on the `g6e` L40S).
+
+**16GiB of RAM is enough, and 8GiB suffices at 2 vCPU.** Peak host memory stayed under ~4GiB on every 2-4 vCPU instance with no OOM kills, far below Isaac Sim's nominal 32GB guidance. RAM demand tracks vCPU rather than GPU, though: the 12 vCPU instance peaked at 11GiB. Budget roughly 1GiB per vCPU and do not pay for memory this workload never touches.
+
+**Cartpole is CPU-bound, so vCPU count and clock speed drive throughput more than the GPU does.** The 4 vCPU L4 beat the 4 vCPU L40S, and the 12 vCPU L40S beat everything by a wide margin. Cheaper per hour is therefore not always cheaper per result: the GCP L4 costs 12% less than the AWS L4 but runs 33% slower, and the 2 vCPU GCP T4 costs 16% less than the AWS T4 but runs 53% slower. Choose L40S for VRAM-bound scenes rather than for speed, and treat differences under ~10% as noise — four `g6e.xlarge` runs drifted across 168972 / 158331 / 152642 fps.
 
 > Pick x86_64. AWS `g5g.*` instances carry a T4**g** on **arm64** and cannot run this image, despite matching on GPU name, VRAM, and RAM in instance searches.
+
+#### Other Clouds
+
+Brev provisions each cloud through its own `cloudCredId`: `devplane-brev-1-credential` (AWS), `brev-gcp-test` (GCP), `shadeform`, `crusoe-prod`, `brev-nebius-prod`. The create path is otherwise identical, and the setup script needs no changes for any of them.
+
+Two differences matter if you ever move off AWS. Non-AWS base images already ship a 580 driver, so the script installs nothing and skips its reboot — that is why the shadeform L40S reached `ready` in ~4 minutes against 14-23 on AWS, whose base ships 595 and forces the downgrade. And disk size is not always yours to choose: `massedcompute_L40S` provisions its fixed 625GB regardless of the requested `diskStorage`. GCP lists no L40S at all.
+
+#### Disk Sizing
+
+Use **256GiB**; shrinking it saves almost nothing and fails quickly:
+
+| Disk | Result |
+|------|--------|
+| 64GiB | Never provisions — `InvalidBlockDeviceMapping: Volume of size 64GB is smaller than snapshot, expect size >= 75GB` |
+| 80GiB | Provisions, then the image pull dies with `No space left on device`, leaving a half-built VM |
+| 256GiB | Works, 94-96GB used at `ready` |
+
+Brev's AWS base image alone occupies ~52GB, 41GB of which is four side-by-side CUDA toolkits (`cuda-12.8`, `12.9`, `13.0`, `13.2`), before this image's ~34GB and its transient extraction space. The practical floor is ~120GiB, and storage bills at about $0.10/GB/month — so the difference between 120GiB and 256GiB is roughly $0.015/hr, noise against a $0.63-$2.23 instance.
 
 ## Local
 
