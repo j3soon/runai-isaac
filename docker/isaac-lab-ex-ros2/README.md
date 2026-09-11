@@ -98,6 +98,12 @@ Sorted by price:
 | `massedcompute_L40S` | shadeform | L40S (48GB) | 12 | 72GiB | $1.06 | ~4 min | 11034 MiB | 260593 |
 | `g6e.xlarge` | AWS | L40S (45GB) | 4 | 32GiB | $2.23 | ~14-23 min | 3902 MiB | 152642 |
 
+> **The two GCP rows are CPU-rendered and are not evidence of GPU rendering.** Measured 2026-08-19 on `g2-standard-4:nvidia-l4:1`: `vulkaninfo` inside the container reports only `llvmpipe`, and Kit logs `Driver Version: 0` rather than the host's 580.173.02. The cartpole numbers above are real, because PhysX still runs on the GPU through CUDA and cartpole needs no rendering — but the renderer is Mesa software throughout.
+>
+> Adding cameras fails outright. `Isaac-Cartpole-RGB-Camera-Direct-v0 --headless --enable_cameras --num_envs 16` never finished environment setup and was killed at a 450s timeout, with PhysX additionally falling back to software (`GPU solver pipeline failed, switching to software`).
+>
+> The cause is host-side and affects any image: Brev's GCP instances install a compute-only NVIDIA driver, so `/usr/lib/x86_64-linux-gnu` contains no `libGLX_nvidia`, `libEGL_nvidia`, or `libnvidia-glcore` for the container toolkit to inject. GCP does offer graphics-capable [RTX Virtual Workstation types](https://docs.cloud.google.com/compute/docs/gpus) (`nvidia-l4-vws`, `nvidia-tesla-t4-vws`, ...), which Google describes as intended for "NVIDIA Omniverse simulation workloads", but `brev search gpu` exposes none of them. Treat GCP as compute-only for Isaac workloads on Brev, and see [the Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the full measurement.
+
 VRAM is the size Brev's instance search reports; `nvidia-smi` shows slightly less usable memory (for example 15360 MiB on the T4, 46068 MiB on the `g6e` L40S).
 
 **16GiB of RAM is enough, and 8GiB suffices at 2 vCPU.** Peak host memory stayed under ~4GiB on every 2-4 vCPU instance with no OOM kills, far below Isaac Sim's nominal 32GB guidance. RAM demand tracks vCPU rather than GPU, though: the 12 vCPU instance peaked at 11GiB. Budget roughly 1GiB per vCPU and do not pay for memory this workload never touches.

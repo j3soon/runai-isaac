@@ -92,53 +92,171 @@ upstream rather than only locally:
 
 So keep the downgrade, and treat "the docs don't forbid this driver" as weak evidence either way.
 
-## A Vulkan Failure Is the Image's Loader, Not the Host Driver
+## `ERROR_INCOMPATIBLE_DRIVER` Usually Means a Missing EGL Vendor File, Not a Bad Driver
 
-`nvidia-smi` working is not evidence that a rendering workload will run, and a Vulkan failure
-is not evidence that the host driver is broken. Both were measured on `g6e.xlarge` (L40S) with
-the same setup script installing Ubuntu's `nvidia-driver-580` over Brev's stock 595, resolving
-to driver 580.178.04 on both instances:
+A container that fails Vulkan with
 
-| image | base | `vulkaninfo` in container | Isaac Sim |
-| --- | --- | --- | --- |
-| `runai-hcis-lab-aicapstone` | `nvidia/cuda:12.8.1-devel-ubuntu22.04` | `ERROR_INCOMPATIBLE_DRIVER` | `Failed to create any GPU devices` |
-| `runai-isaac-lab-ex-ros2:2.3.2` | `ubuntu:24.04` | `deviceName = NVIDIA L40S` | `Graphics API: Vulkan`, camera env sets up |
-
-Same cloud, same instance type, same driver, same setup script. **Only the container's Vulkan
-loader differs**: Ubuntu 22.04 ships libvulkan1 ~1.3.204 (early 2022), which cannot load the
-580.178.04 ICD; Ubuntu 24.04's loader can. The symptom is
-`Could not get 'vkCreateInstance' via 'vk_icdGetInstanceProcAddr'`, which is the loader/ICD
-interface-version mismatch signature and reads misleadingly like a driver fault.
-
-That first row cost a wrong conclusion here. These were all checked and cleared before the
-comparison was run, so do not spend time on them: GL libraries are mounted,
-`NVIDIA_DRIVER_CAPABILITIES=all`, the ICD JSON is valid, `libGLX_nvidia.so.0` dlopens and
-exports `vk_icdGetInstanceProcAddr`, device nodes and kernel modules are present, and the GPU
-is Pass-Through with Compute Mode Default. Mounting the host's `/usr/share/vulkan/icd.d` and
-setting `VK_ICD_FILENAMES` change nothing.
-
-**Testing the host proves less than it looks.** `vulkaninfo` installed on the host from its own
-archive exercises *that* distribution's loader, so an old host userspace reproduces the same
-error and invites the same wrong conclusion. The decisive experiment is a second image with a
-newer base on the same instance — that isolates the loader from the driver in one run.
-
-So probe Vulkan per image, not per host, before trusting a rendering deployment:
-
-```sh
-sudo docker run --rm --gpus all <image> vulkaninfo --summary | grep -E "deviceName|ERROR"
-# working: deviceName = NVIDIA <model>;  broken: ERROR_INCOMPATIBLE_DRIVER, or only llvmpipe
+```
+Could not get 'vkCreateInstance' via 'vk_icdGetInstanceProcAddr' for ICD libGLX_nvidia.so.0
+vkCreateInstance failed with ERROR_INCOMPATIBLE_DRIVER
 ```
 
-One mitigation is worth trying before rebuilding an image, though it was **not** tested here:
-Kit verifies the driver version itself, and drivers above 535.255
-[report their version incorrectly through Vulkan](https://github.com/isaac-sim/IsaacLab/issues/3604),
-so Kit can misidentify a working driver as incompatible. That check can be disabled with
-`--/rtx/verifyDriverVersion/enabled=false`. It only helps when the loader can create an instance
-at all — where `vulkaninfo` in the same container already fails, as it did here, the problem is
-below Kit and this flag cannot fix it.
+is most likely missing `/usr/share/glvnd/egl_vendor.d/10_nvidia.json`. The NVIDIA container toolkit
+injects the Vulkan **ICD**, but not the GLVND **EGL vendor** registration; without a display the
+NVIDIA Vulkan ICD reaches the GPU through EGL/GBM, and that path needs the vendor registered. Add
+it in the image:
+
+```dockerfile
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
+    printf '%s\n' '{' '    "file_format_version" : "1.0.0",' '    "ICD" : {' \
+      '        "library_path" : "libEGL_nvidia.so.0"' '    }' '}' \
+      > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+```
+
+Images built from a desktop-driver machine's assumptions omit it silently, because a normal driver
+install provides the file.
+
+**Which bases need it** (checked across this repository, 2026-08-19):
+
+| base | ships `10_nvidia.json`? |
+| --- | --- |
+| `nvcr.io/nvidia/isaac-lab:*`, `nvcr.io/nvidia/isaac-sim:*` | **yes** — inherited, nothing to do |
+| `nvidia/cuda:*`, bare `ubuntu:*` | **no** — add it if the image renders |
+
+So every image here built on an NGC Isaac base is unaffected, and the repository's `-ex` images
+already write the file by hand because they start from `ubuntu`. Only an image that both starts
+from `nvidia/cuda`/`ubuntu` *and* needs Vulkan is exposed. Check with:
+
+```sh
+docker run --rm <image> ls /usr/share/glvnd/egl_vendor.d/
+```
+
+ This repository's `isaac-lab-ex-ros2` image already writes it, which is
+why it rendered on hosts where `hcis-lab-aicapstone` could not — the two ran on the *same* AWS host,
+minutes apart, one working and one not.
+
+**The host driver is a contributing condition, not the fault.** The gap only surfaced where Brev's
+AWS base ships 595 and the setup script downgrades to Ubuntu's `nvidia-driver-580`; on shadeform,
+whose base already ships 580, the same image worked without the file. So a Vulkan failure that
+disappears when you change provider is not evidence the provider was broken.
+
+**Ruled out by direct measurement on a failing host.** All of these cost real instance time and
+none is the cause:
+
+- **The Vulkan ICD JSON.** Both images carry byte-identical ICD JSON *at runtime* — the toolkit
+  overwrites an image's hand-written copy, so a baked `api_version` is not what differs. Check the
+  file inside a running container before theorising about it.
+- **The Vulkan loader version** (LunarG 1.4.313.0 over Ubuntu 22.04's 1.3.204.1).
+- **The base image and glibc.** A 24.04 base changed nothing, and a bare `ubuntu:24.04` failed too.
+- **`undefined symbol: __malloc_hook` / `ErrorF` under `LD_DEBUG`.** The *working* container emits
+  the identical set. Loader noise, not a fault — do not build a theory on it, as was done here.
+- CUDA forward-compat libraries, `LD_LIBRARY_PATH`, `mesa-vulkan-drivers`, `VK_ICD_FILENAMES`,
+  bind-mounting `libnvidia-api.so.1`.
+
+**The method that actually found it**, after roughly $25 and four wrong conclusions: put a working
+image and a failing image on the *same* host, then diff what each loads during
+`LD_DEBUG=libs vulkaninfo`. The working one pulled in `libEGL_nvidia`, `libnvidia-eglcore` and
+`libnvidia-egl-gbm`; the failing one did not, and the EGL vendor file was the only config
+difference left. Reach for that A/B first — it is one instance and about an hour.
 
 A rendering failure of this kind also **hangs rather than exits**: the Kit process stayed alive
 20+ minutes after printing the error. Gate a watcher on a log marker, never on process exit.
+
+## Provider Choice for Rendering Workloads
+
+**GCP cannot run a rendering workload at all.** Its instances install a *compute-only* NVIDIA
+driver: no `libGLX_nvidia`, no `libEGL_nvidia`, no `libnvidia-glcore` anywhere on the host. The
+container toolkit can only inject libraries the host actually has, so no image can render there.
+Verified on both a T4 and an L4 instance, and confirmed image-independent — `isaac-lab-ex-ros2` on
+the same GCP host also falls back to `llvmpipe` software rendering rather than using the GPU.
+
+**GCP does have graphics-capable SKUs, but Brev does not offer them.** Google's
+[GPU documentation](https://docs.cloud.google.com/compute/docs/gpus) lists NVIDIA RTX Virtual
+Workstation types — `nvidia-rtx-pro-6000-vws` (G4), `nvidia-l4-vws` (G2), and
+`nvidia-tesla-t4-vws` / `-p4-vws` / `-p100-vws` (N1) — and describes them as "designed for
+workloads such as **NVIDIA Omniverse simulation workloads**, graphics-intensive applications,
+video transcoding, and virtual desktops". Creating a vWS instance automatically attaches a vWS
+license, and that is the SKU family intended for Isaac Sim on GCP.
+
+`brev search gpu` offers none of them. Checked 2026-08-19: every GCP accelerator Brev exposes is a
+plain compute type (`nvidia-tesla-t4`, `-p4`, `-v100`, `-a100`, `nvidia-a100-80gb`,
+`nvidia-h100-mega-80gb`, `nvidia-l4`), with zero `-vws` entries. So **GCP-via-Brev cannot render**,
+and that is a catalogue limitation rather than a property of GCP itself. If GCP is required for a
+rendering workload, provision a vWS instance outside Brev.
+
+> Google's page does not spell out the driver-level difference, so treat the causal chain as
+> inferred: what was *measured* here is that Brev's non-vWS GCP instances ship no graphics
+> libraries at all.
+
+**Confirmed by direct test, not inference.** On `g2-standard-4:nvidia-l4:1` running the
+`isaac-lab-ex-ros2` 2.3.2 image:
+
+| test | result |
+| --- | --- |
+| `vulkaninfo` in container | `llvmpipe` only, no NVIDIA device |
+| `Isaac-Cartpole-v0`, no cameras | **passes**, 95627 fps total — but Kit logs `Driver Version: 0` |
+| `Isaac-Cartpole-RGB-Camera-Direct-v0 --enable_cameras` | **fails**, killed at 450s having never completed environment setup |
+
+`Driver Version: 0` is the tell: Kit is on software Vulkan, not the host's 580.173.02. Cartpole
+still posts high fps because PhysX runs on the GPU through CUDA and the workload renders nothing.
+Add cameras and PhysX drops to software too (`GPU solver pipeline failed, switching to software`).
+
+So the GCP rows in the `isaac-lab-ex-ros2` verified-instance table are genuine cartpole numbers but
+are **not** evidence of GPU rendering, and that table now carries a note saying so. A passing
+non-rendering benchmark cannot validate a rendering deployment — check `Driver Version` in the Kit
+log, or `vulkaninfo`, before believing a GPU is being used for graphics.
+
+**Do not try to fix a host.** Installing `libnvidia-gl-<branch>` on a GCP instance added the
+libraries and then broke the NVIDIA container toolkit outright — GPU containers stopped starting
+with `/run/nvidia-persistenced/socket: no such file or directory`, which is strictly worse than the
+original failure. A Brev VM should need only the driver, Docker, and a working container toolkit;
+everything else belongs in the image. When a rendering workload fails, fix the container.
+
+Measured throughput for one Isaac Sim camera-recording workload (`--num_envs 1`, two 640x480
+cameras), which generalises better than a GPU ranking:
+
+| | 12 vCPU L40S | 8 vCPU T4 | 4 vCPU L4 | 4 vCPU L40S | 4 vCPU T4 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| wall clock | 193s | 460s | 471s | 492s | 745s |
+
+**vCPU count dominates, not the GPU.** The same L40S went from 492s to 193s purely on vCPUs, and an
+8 vCPU T4 beat a 4 vCPU L40S. Peak VRAM was only 4.0-5.6GiB across T4/L4/L40S, so a 15GiB T4 is not
+VRAM-constrained for single-environment recording. Buy vCPUs before a bigger GPU.
+
+Shadeform `massedcompute_L40S` is the best value at $1.06/hr and skips the driver downgrade, but
+budget a retry: 2 of 4 creates failed with `build_status=CREATE_FAILED` before any relay appeared,
+and an immediate identical retry succeeded each time.
+
+## Two Ways a Matrix Run Lies To You
+
+Both cost time here, and both are cheap to avoid:
+
+- **`grep`-ing for the vendor name misses Tesla cards.** A Vulkan probe matching
+  `deviceName.*NVIDIA` reports a false failure on a T4, which identifies itself as `Tesla T4`.
+  Three rows read as broken while their datagen had actually succeeded. Assert on the *workload's*
+  output, not on a device-name string.
+- **`pkill -f <script>` run over SSH kills the launching shell.** The `ssh host 'pkill -f rt.sh;
+  ... rt.sh &'` pattern matches its own command line, so the relaunch dies instantly and every
+  instance sits idle looking stalled. Match a path that cannot appear in the launcher, or do not
+  pre-kill at all.
+
+## Let the Setup Script Lose the apt Race
+
+Brev's own provisioning runs `apt-get` concurrently with a VM setup script. A script that starts
+with `set -euo pipefail` and calls `apt-get update` immediately will die on
+`Could not get lock /var/lib/apt/lists/lock`, leaving the phase file at its first state — which
+reads as a stalled instance rather than a failed one, and wasted an hour of billing here before it
+was noticed. Wait for the lock and retry:
+
+```sh
+wait_for_apt() {
+  for _ in $(seq 1 120); do
+    sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock \
+      >/dev/null 2>&1 || return 0
+    sleep 15
+  done
+}
+```
 
 ## Reach the Instance Over Its SSH Relay, Not `brev exec`
 
@@ -301,6 +419,14 @@ and all were the watcher's fault rather than Brev's:
   for most of a 2.3.2 deploy because its gpu-driver health check fails until the driver
   reboot. Gate on `shell_status=READY`, which is what tracks SSH availability.
 
+- **`build_status=CREATE_FAILED` is a distinct failure field.** A shadeform provision failed with
+  `status=RUNNING`, `shell_status=NOT READY`, and `build_status=CREATE_FAILED`, so a watcher gating
+  only on `status`/`shell_status` waited out its full timeout on an instance that was already dead.
+  Abort on `CREATE_FAILED` and on `environment-build -> failed`, not just on `FAILURE`.
+- **Provisioning failures happen and are often transient.** That same shadeform type failed to
+  create once and succeeded on an immediate retry with an identical payload. One retry before
+  changing anything is reasonable; treat a second identical failure as real.
+
 Also give a watcher an abort condition, not only a success condition: check for `FAILURE`
 status and grep the setup log for `no space left`. A failed create otherwise looks exactly
 like a slow one for as long as the timeout allows.
@@ -321,14 +447,25 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BREV_API/api/workspaces/<ID>" \
 `lifecycle_status: terminating` with `terminate-environment-instance: succeeded` means the
 charge has stopped. Still confirm the row eventually disappears from `brev ls --all`.
 
-**A delete can fail and leave the row as `STOPPED`, which does not look like a failure.** One
-instance here went `DELETING` for several minutes, then reverted to `STOPPED` — reading as a
+**A delete can fail and leave the row as `STOPPED`, which does not look like a failure.** Two
+instances here went `DELETING` for several minutes and then reverted to `STOPPED`, reading as a
 deliberate stop rather than a delete that did not finish. The task list showed the real story:
-`terminate-environment-instance: succeeded` (so the machine and its hourly charge were gone)
-alongside `delete-environment: failed`, leaving the control-plane record and its disk. Re-issuing
-`brev delete` cleared it. So confirm deletion by absence from `brev ls --all`, and treat a
-`STOPPED` row you did not stop as an unfinished delete — a 256GiB volume still bills storage at
-roughly $0.10/GB/month even with the instance terminated.
+`terminate-environment-instance: succeeded` — so the machine and its hourly charge were gone —
+alongside `delete-environment: failed`.
+
+That `delete-environment` failure can be **persistent and server-side**, and it exposes no error
+message. Both `brev delete` (twice) and `DELETE /api/workspaces/<id>` (which returns `202
+Accepted`) were retried and the task failed again each time, leaving the rows in place. So:
+
+- Confirm deletion by **absence** from `brev ls --all`, never by a delete command succeeding.
+- Treat a `STOPPED` row you did not stop as an unfinished delete.
+- Retrying beyond twice is not useful once the task is failing repeatedly. Fall back to the
+  console at <https://brev.nvidia.com>, or contact Brev, rather than looping.
+
+What this does *not* establish is an ongoing charge. Once `terminate-environment-instance`
+succeeds the instance is terminated, and an EC2 root volume is normally deleted with its
+instance, so a stale row is most likely bookkeeping rather than billing. Verify in the console
+before assuming either way; do not report a cost you have not confirmed.
 
 ## Other Brev CLI Behavior
 
