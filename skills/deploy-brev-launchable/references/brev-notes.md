@@ -521,3 +521,80 @@ root when running from a clone, but the setup script installs the Compose file a
 `/opt/isaac-lab-ex-ros2/`, where `../..` resolves to `/` and mounts the whole VM root into
 the container read-write. Set `WORKSPACE_DIR` explicitly on Brev if that is not what you
 want.
+
+## `brev delete` Cannot Remove Teammates' Instances — the REST API Can
+
+`brev delete <name-or-id>` only resolves instances the **logged-in account owns**. For an
+instance created by anyone else it exits non-zero with
+
+```
+delete.handleAdminUser: instance with id/name <id> not found
+```
+
+`not found` is misleading — the instance exists and `brev ls --all` lists it. The lookup is
+ownership-scoped, and there is no `--all`, `--org`, or admin flag on `brev delete` to widen it.
+Being `OrganizationAdmin` does not change the CLI's behaviour.
+
+**This is a CLI limitation, not a permissions one.** The REST API deletes another member's
+instance fine for an org admin, returning `202 Accepted`:
+
+```sh
+TOK=$(jq -r .access_token ~/.brev/credentials.json)
+H=https://brevapi.us-west-2-prod.control-plane.brev.dev
+curl -s -X DELETE -H "Authorization: Bearer $TOK" "$H/api/workspaces/<INSTANCE_ID>"
+```
+
+Only the flat `/api/workspaces/<id>` route exists; the org-scoped
+`/api/organizations/<ORG_ID>/workspaces/<id>` variant is a 404.
+
+**Do not infer capability from the role's action list.** Querying the role attachments shows
+`OrganizationAdmin` granting only `CreateWorkspaces` and `ViewWorkspaces`, with no workspace
+delete or modify action anywhere — which reads as "admins cannot delete other people's
+instances" and is wrong. The enforced permission is broader than the advertised action list.
+Verify with one real call against a single instance instead of concluding from this output:
+
+```sh
+curl -s -H "Authorization: Bearer $TOK" "$H/api/users/<YOUR_USER_ID>" \
+  | jq -r '.roleAttachments[] | select(.object|startswith("org-")) | "\(.object)\t\(.role.id)\t\(.role.actions|join(","))"'
+```
+
+Deletion is asynchronous: instances sit at `DELETING` for roughly 2–4 minutes before
+disappearing from the org listing. Poll rather than assuming the `202` finished the job.
+
+**The access token expires in well under an hour**, and a long poll loop will start returning
+`{"errors":[{"type":"UnauthorizedError"}]}` mid-run, which is easy to misread as the instances
+becoming inaccessible. Any `brev` CLI command refreshes `~/.brev/credentials.json`; re-read the
+token afterwards.
+
+Useful counterpart: the org-scoped REST route returns every instance with owner and creation
+time, which `brev ls --all` omits (its JSON carries only `id`, `name`, `status`, `instance_type`,
+`gpu`, `build_status`, `health_status`, `instance_kind`):
+
+```sh
+curl -s -H "Authorization: Bearer $TOK" "$H/api/organizations/<ORG_ID>/workspaces" \
+  | jq -r '.[] | [.id, .name, .createdByUserId, .createdAt, .status] | @tsv'
+curl -s -H "Authorization: Bearer $TOK" "$H/api/users/<USER_ID>" | jq -r '.email'
+```
+
+Use it to identify owners and instance age **before** proposing a bulk delete — a set of
+instances created within a couple of hours of each other by many distinct users is a live
+workshop, not leftover resources. Confirm the session has ended before destroying anything.
+
+## `brev delete` Reads stdin, Which Breaks `while read` Loops
+
+`brev delete` is pipeable (`echo instance-name | brev delete`), so it consumes stdin when none
+is redirected. Inside a `while IFS= read -r ... done < list.txt` loop it swallows every
+remaining line of the list on the first iteration, then reports each swallowed line as a
+separate `not found` error and the loop ends after one pass. The failure looks like a
+permissions problem and hides how many targets were actually attempted.
+
+Redirect stdin per invocation:
+
+```sh
+while IFS=$'\t' read -r name id; do
+  brev delete "$id" </dev/null || echo "FAIL $name"
+done < targets.tsv
+```
+
+The same applies to `brev stop`/`brev start`. Prefer passing several names in one call
+(`brev delete a b c`) or a `for` loop over an array when the list is already in memory.
