@@ -29,7 +29,9 @@ docker run --rm j3soon/runai-hcis-lab-aicapstone:latest \
 
 `docker/hcis-lab-aicapstone/Dockerfile` is a self-contained local variant that clones the upstream repo at a pinned commit during the build, since the upstream Dockerfile `COPY`s from its own working tree (`dependencies/IsaacLab`, a git submodule, and `packages/simulator`). It also bakes in the whole project tree, because upstream's `make launch-isaaclab-*` targets bind-mount the host clone over `/workspace/aicapstone` at run time and this image has no such mount.
 
-It uses upstream's own base and stack rather than this repository's usual `nvcr.io/nvidia/isaac-lab:X` images: `nvidia/cuda:12.8.1-devel-ubuntu22.04` with Isaac Sim 5.1.0 installed from pip (`isaacsim[all,extscache]==5.1.0`), Isaac Lab built from the pinned submodule, and PyTorch 2.7.0 on CUDA 12.8.
+It uses upstream's own stack rather than this repository's usual `nvcr.io/nvidia/isaac-lab:X` images: Isaac Sim 5.1.0 installed from pip (`isaacsim[all,extscache]==5.1.0`), Isaac Lab built from the pinned submodule, and PyTorch 2.7.0 on CUDA 12.8.
+
+The base matches upstream (`nvidia/cuda:12.8.1-devel-ubuntu22.04`). The only addition is a GLVND EGL vendor registration, which the NVIDIA container toolkit does not inject and which `--enable_cameras` needs on some hosts — see [The EGL vendor file is required](#the-egl-vendor-file-is-required). A 24.04 base was trialled while diagnosing that failure and made no difference; it is not needed.
 
 The USD scenes, object meshes, and textures under `packages/simulator/assets/` are committed as plain git blobs, so unlike [Sim-to-Real SO-101 Workshop](../sim-to-real-so101-workshop/README.md) there is no Git LFS step and no pointer-file trap.
 
@@ -154,13 +156,17 @@ Evidence, including full logs, is under `artifacts/hcis-lab-aicapstone/raw/evide
 
 > Skip this section if you're not using Brev.
 
-> **Status: blocked, with a known cause.** A full deployment on `g6e.xlarge` (L40S) reached a healthy VM with driver 580.178.04 and the image pulled, but **Isaac Sim cannot start there**: this image's Ubuntu 22.04 base ships a Vulkan loader too old to load that driver's ICD, so the renderer fails with `Failed to create any GPU devices`. The host driver is fine — the Isaac Lab (Extended) with ROS 2 image, on an `ubuntu:24.04` base, renders correctly on an identical instance. See [Vulkan fails on the Ubuntu 22.04 base](#vulkan-fails-on-the-ubuntu-2204-base) below.
+> **Status: works.** Validated end to end on both AWS `g6e.xlarge` and shadeform `massedcompute_L40S`.
+>
+> An earlier version of this image failed on AWS with `Failed to create any GPU devices`. The cause was a **missing GLVND EGL vendor registration**, now shipped in the Dockerfile — see [The EGL vendor file is required](#the-egl-vendor-file-is-required).
 
 Use **VM Mode**, which is the only Brev runtime mode that lets the host NVIDIA driver version be selected. That matters here: this image pins Isaac Sim 5.1.0, and [Isaac Sim 5.1.0 is tested against Linux driver 580.65.06](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/requirements.html), while Brev's AWS base image ships the 595 branch.
 
 The 595 incompatibility is a known upstream defect, not just a local observation: [IsaacSim#537](https://github.com/isaac-sim/IsaacSim/issues/537) reports driver 595.79 making Isaac Sim 5.1.0 fail to detect the CUDA device and crash during RTX plugin initialization, with "downgrading the NVIDIA driver to version 580 resolves the issue." This repository measured the same thing independently — see the [Isaac Lab (Extended) with ROS 2 Brev notes](../isaac-lab-ex-ros2/README.md#brev). Note the requirements page states no *maximum* driver version, so the constraint is not discoverable there.
 
-Install branch 580 and reboot, exactly as [`brev_setup_2_3_2_ros2_jazzy.sh`](../isaac-lab-ex-ros2/brev_setup_2_3_2_ros2_jazzy.sh) does.
+[`brev_setup.sh`](./brev_setup.sh) in this directory does that: it detects the loaded driver branch, installs 580 and reboots only when needed, pulls the image, and publishes a phase file. Paste it into a Launchable's VM setup script, then track progress with `cat /var/lib/aicapstone-setup.state` and wait for `ready`.
+
+> The script waits for the apt/dpkg lock before its first `apt-get`. Brev's own provisioning runs apt concurrently, and a `set -e` script that skips this dies on `Could not get lock /var/lib/apt/lists/lock`, leaving the phase file at `preparing` — which reads as a stalled instance rather than a failed one.
 
 **Prefer prebuilding.** This image builds Isaac Sim from pip and takes far longer on a rented 4 vCPU instance than on a workstation, and the build needs no GPU at all — it is pure `apt` and `pip`. Build it wherever CPU is cheap, push it to a registry, and have the instance pull it. That keeps the billed instance busy only for the pull and the run.
 
@@ -171,52 +177,59 @@ Two Brev-specific traps for this image in particular:
 - **Do not use upstream's `make launch-isaaclab-glowsai-4090` / `-l40s` targets.** They bind-mount `/home/glows/.Xauthority` and `/opt/VirtualGL`, which do not exist on a Brev instance. Docker silently creates the missing paths as empty *directories*, and the accompanying empty `/usr/share/vulkan/icd.d` mount can mask the ICD the NVIDIA container toolkit injects, breaking Vulkan for `--enable_cameras`. Use the `docker run` above.
 - **Verify Vulkan before a long run**, since `--enable_cameras` needs it: `docker run --rm --gpus all j3soon/runai-hcis-lab-aicapstone:latest vulkaninfo --summary`. On a working host this lists the GPU with `vendorID = 0x10de`; on the failed deployment below it errored instead.
 
-### Vulkan fails on the Ubuntu 22.04 base
+### The EGL vendor file is required
 
-Measured 2026-08-17 on `g6e.xlarge` (L40S), 256GiB disk, with the driver-580 setup script.
+The Dockerfile writes `/usr/share/glvnd/egl_vendor.d/10_nvidia.json`, registering NVIDIA as a GLVND EGL vendor. **Do not remove it.** Upstream omits it because its target machines have a desktop driver install that provides the file; a container gets only what the NVIDIA container toolkit injects, and the toolkit injects the Vulkan ICD but **not** the EGL vendor registration.
 
-The deployment itself was clean and reproduced this repository's existing measurements:
-
-| Phase | Time |
-| --- | ---: |
-| create to `RUNNING` | ~18 min |
-| `nvidia-driver-580` install | ~5 min |
-| image pull (18.87GB) | ~12.5 min |
-| reboot to `ready` | ~1 min |
-| **create to `ready`** | **~40 min** |
-
-Driver went 595.91.07 to 580.178.04, the reboot loaded it, `nvidia-smi` and CUDA worked inside the container, and disk sat at 105G of 249G used. Then Isaac Sim failed to start:
+Without it, on a host whose driver was installed by downgrading:
 
 ```
-[carb.graphics-vulkan.plugin] vkCreateInstance failed. Vulkan 1.1 is not supported, or your driver requires an update.
-[carb.graphics-vulkan.plugin] VkResult: ERROR_INCOMPATIBLE_DRIVER
-[omni.gpu_foundation_factory.plugin] Failed to create any GPU devices, including an attempt with compatibility mode.
+vulkaninfo -> Could not get 'vkCreateInstance' via 'vk_icdGetInstanceProcAddr' for ICD libGLX_nvidia.so.0
+              vkCreateInstance failed with ERROR_INCOMPATIBLE_DRIVER
+Isaac Sim  -> Failed to create any GPU devices, including an attempt with compatibility mode.
 ```
 
-**This is the image's Vulkan loader, not the host driver.** A control run settles it: the [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md) 2.3.2 image, deployed from its Launchable onto an identical `g6e.xlarge` with the same setup script and the same resulting driver 580.178.04, reports `deviceName = NVIDIA L40S` from `vulkaninfo`, logs `Graphics API: Vulkan`, and completes `Isaac-Cartpole-RGB-Camera-Direct-v0 --enable_cameras` environment setup with no Vulkan errors at all.
+With it, on the same host, `vulkaninfo` reports `deviceName = NVIDIA L40S` and datagen runs. The NVIDIA Vulkan ICD reaches the GPU through EGL/GBM when there is no display, and that path needs a registered EGL vendor.
 
-The only material difference is the base image. This image inherits `nvidia/cuda:12.8.1-devel-ubuntu22.04`, whose libvulkan1 is ~1.3.204 from early 2022 and cannot load the 580.178.04 ICD; the ROS 2 image is built on `ubuntu:24.04`. The error string — `Could not get 'vkCreateInstance' via 'vk_icdGetInstanceProcAddr'` — is the loader/ICD interface-version mismatch signature, which reads misleadingly like a driver fault.
+**Why it only appears on some hosts.** Brev's AWS base image ships driver 595, [Isaac Sim 5.1.0 cannot run on 595](https://github.com/isaac-sim/IsaacSim/issues/537), so the setup script installs Ubuntu's `nvidia-driver-580` over it. That downgraded host is missing pieces a normal install provides, which is what exposes the gap. On a provider whose base already ships 580 (shadeform `massedcompute_L40S`) this image worked even before the fix. The error message blames the driver and is therefore doubly misleading: the driver is a contributing condition, but the missing file is in the image.
 
-> Testing Vulkan on the *host* is not a valid check: `vulkaninfo` installed from the host's own archive exercises that distribution's loader and reproduces the same error, which is what first led this investigation to blame the driver.
+This also explains a comparison that was confusing for a long time: this repository's [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md) image rendered on the same AWS host where this one did not, at the same moment. That image writes the same EGL vendor file at build time.
 
-The likely fix is to install a newer Vulkan loader into this image, or move it to an Ubuntu 24.04 base — both deviations from upstream's Dockerfile, and neither is tested here. Note the image works unmodified on a local Ubuntu 22.04 host running driver 580.173.02, so the incompatibility is specific to certain driver builds rather than universal.
+**Ruled out by direct test on the failing host** — each was measured, so do not re-investigate:
 
-One cheaper mitigation is worth trying first, though it is **untested here**: Kit runs its own driver-version check, and drivers above 535.255 [report their version incorrectly through Vulkan](https://github.com/isaac-sim/IsaacLab/issues/3604), so Kit can reject a working driver. Disable it with `--/rtx/verifyDriverVersion/enabled=false`. That only helps if the Vulkan loader can create an instance at all — here `vulkaninfo` fails inside the same container, which puts the fault below Kit, so this flag most likely will not be sufficient on its own.
+- The Vulkan ICD JSON. Both images carry byte-identical ICD JSON *at runtime* (`api_version 1.4.312`); the toolkit overwrites the ROS 2 image's hand-written `1.3.194` version, so that file is not the difference.
+- The Vulkan loader version (LunarG 1.4.313.0 over Ubuntu 22.04's 1.3.204.1).
+- The base image and glibc. A 24.04 base (glibc 2.39, loader 1.3.275.0) changed nothing, and a bare `ubuntu:24.04` failed on that host too.
+- The `undefined symbol: __malloc_hook / ErrorF` messages under `LD_DEBUG`. The **working** container emits the identical set, so they are loader noise, not a fault.
+- CUDA forward-compat libraries, `LD_LIBRARY_PATH`, `mesa-vulkan-drivers`, `VK_ICD_FILENAMES`, and bind-mounting `libnvidia-api.so.1`. `libGLX_nvidia` is byte-identical to the host's in both images and `libnvidia-glcore` resolves fully in both.
 
-These were each checked and are **not** the cause:
+### Verified Instance Types
 
-- All GL libraries are mounted into the container (`libGLX_nvidia.so.580.178.04`, `libnvidia-glvkspirv.so.580.178.04`, `libnvidia-glcore.so.580.178.04`), and `NVIDIA_DRIVER_CAPABILITIES` is `all`.
-- The ICD JSON is well-formed and points at `libGLX_nvidia.so.0`. Mounting the host's `/usr/share/vulkan/icd.d` (as upstream's Makefile does) and setting `VK_ICD_FILENAMES` both fail identically.
-- `libGLX_nvidia.so.0` dlopens successfully and *does* export `vk_icdGetInstanceProcAddr`; the loader's call for `vkCreateInstance` returns null, so the ICD is refusing to initialize.
-- Device nodes (`nvidia0`, `nvidiactl`, `nvidia-uvm`, `nvidia-modeset`) and kernel modules (`nvidia`, `nvidia_uvm`, `nvidia_drm`, `nvidia_modeset`, proprietary, 580.178.04) are all present.
-- The GPU is `Pass-Through` with `Compute Mode: Default` — not vGPU or MIG.
+Measured 2026-08-19 with `j3soon/runai-hcis-lab-aicapstone:latest`, one `--num_demos 3` cup-stacking datagen run per instance, 256GiB disk (625GB fixed on shadeform). Sorted by price.
 
-A failed run also **hangs rather than exiting**: the Kit process stayed alive for 20+ minutes after the error and had to be killed. Do not wait on process exit as a completion signal.
+| Instance | Cloud | GPU (VRAM) | vCPU | RAM | $/hr | Datagen | Wall clock | Peak RAM | Peak VRAM |
+| --- | --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: |
+| `n1-standard-2:nvidia-tesla-t4:1` | GCP | T4 (15360 MiB) | 2 | 8GiB | $0.53 | **fails** | - | - | - |
+| `g4dn.xlarge` | AWS | T4 (15360 MiB) | 4 | 16GiB | $0.63 | passes | 745s | 7570 MiB | 4025 MiB |
+| `g2-standard-4:nvidia-l4:1` | GCP | L4 (23034 MiB) | 4 | 16GiB | $0.85 | **fails** | - | - | - |
+| `g4dn.2xlarge` | AWS | T4 (15360 MiB) | 8 | 32GiB | $0.90 | passes | 460s | 8128 MiB | 4025 MiB |
+| `g6.xlarge` | AWS | L4 (23034 MiB) | 4 | 16GiB | $0.97 | passes | 471s | 7766 MiB | 4449 MiB |
+| `massedcompute_L40S` | shadeform | L40S (46068 MiB) | 12 | 72GiB | $1.06 | passes | 193s | 10437 MiB | 5605 MiB |
+| `g6e.xlarge` | AWS | L40S (46068 MiB) | 4 | 32GiB | $2.23 | passes | 492s | 7377 MiB | 5592 MiB |
 
-Two untested paths remain, in the order worth trying:
+**GCP does not work, and no image change can fix it.** Both GCP rows produced an empty dataset. Their hosts install a *compute-only* NVIDIA driver: `/usr/lib/x86_64-linux-gnu` contains no `libGLX_nvidia`, `libEGL_nvidia`, or `libnvidia-glcore` at all, so the container toolkit has nothing to inject and the NVIDIA Vulkan ICD cannot load. This is not specific to this image — the [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md) image on the same GCP host also falls back to `llvmpipe` software rendering rather than using the GPU.
 
-1. **Keep Brev's stock 595 driver** and check whether Isaac Sim 5.1.0 actually fails on it for *this* image. The "5.1.0 fails on 595" result recorded for [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md#brev) was measured on a different image, and a provider's own base image is likely to ship a working Vulkan stack. If 595 works here, the whole driver downgrade — and its reboot — is unnecessary.
-2. **Install 580 from NVIDIA's `.run` installer** rather than the Ubuntu package, in case the packaged build omits a working Vulkan ICD.
+GCP itself is not the problem — its catalogue includes NVIDIA RTX Virtual Workstation types (`nvidia-l4-vws`, `nvidia-tesla-t4-vws`, `nvidia-rtx-pro-6000-vws`, ...), which Google describes as intended for "NVIDIA Omniverse simulation workloads". **Brev exposes none of them**: every GCP accelerator in `brev search gpu` is a plain compute type. So this is a Brev catalogue limitation, and running on GCP would mean provisioning a vWS instance outside Brev.
+
+> Do not try to repair this on the host. Installing `libnvidia-gl-<branch>` on a GCP instance added the libraries but broke the NVIDIA container toolkit outright (`/run/nvidia-persistenced/socket: no such file or directory`), leaving the box unable to start GPU containers at all — strictly worse than before.
+
+**Everything from a T4 upward works, and 16GiB of RAM is enough.** Peak host RAM stayed between 7.4 and 8.1GiB on every 4-8 vCPU instance; the 12 vCPU shadeform box peaked higher at 10.4GiB, tracking vCPU rather than GPU. Peak VRAM was 4.0GiB on T4, 4.4GiB on L4 and 5.6GiB on L40S, so the 15360 MiB T4 has ample headroom — VRAM is not the constraint for `--num_envs 1`.
+
+**Wall clock is dominated by vCPU count, not by the GPU.** The 12 vCPU L40S finished in 193s while the 4 vCPU L40S took 492s — 2.5x slower on identical hardware otherwise. The 4 vCPU T4 was slowest at 745s, and doubling it to 8 vCPU (`g4dn.2xlarge`) cut that to 460s, beating the 4 vCPU L4. **If throughput matters, buy vCPUs rather than a bigger GPU.**
+
+Best value is `massedcompute_L40S` at $1.06/hr: cheapest per episode, fastest, and it skips the driver downgrade and reboot entirely. Budget a retry — 2 of 4 shadeform creates failed with `build_status=CREATE_FAILED` before any relay appeared, and an immediate identical retry succeeded each time.
+
+> Episode counts vary between runs. `--num_demos 3` normally exports 2 episodes / 1010 frames, but the shadeform run exported 1 / 505 because one episode failed its task under domain randomization. Combined with the [N-1 export bug](#--num_demos-n-exports-only-n-1-episodes), treat the exported count as `successes - 1`.
 
 ## Scope
 

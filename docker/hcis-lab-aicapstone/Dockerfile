@@ -17,6 +17,11 @@
 # That commit records the `dependencies/IsaacLab` submodule at
 # 4df6560e187f2cc66685b41b21b259f4485d0c22, which `git submodule update` restores exactly.
 #
+# The base matches upstream. A 24.04 base was trialled while chasing a Vulkan failure on Brev/AWS
+# and did NOT fix it: the cause is the host's 595-to-580 driver downgrade on Brev's AWS base, which
+# leaves the driver's graphics userspace broken, not anything in this image. Deploy on a provider
+# whose base already ships a 580-branch driver (see this image's README) and it renders unmodified.
+#
 # Only the data-generation surface is covered. Upstream's rollout step needs a trained checkpoint,
 # and upstream directs training to the host rather than into this container.
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
@@ -177,6 +182,31 @@ RUN printf "numpy==1.26.0\n" > /tmp/sim-constraints.txt \
 
 RUN python -m pip install --upgrade pip==26.0.1 \
     && python -m pip install --no-deps numpy==1.26.0
+
+# Local addition: register NVIDIA as a GLVND EGL vendor. Upstream omits this because its target
+# has a desktop driver install that provides the file; a container gets only what the NVIDIA
+# container toolkit injects, and the toolkit injects the Vulkan ICD but not this.
+#
+# Without it, `vkCreateInstance` fails with ERROR_INCOMPATIBLE_DRIVER on a host whose driver was
+# installed by downgrading (Brev's AWS base ships 595 and Isaac Sim 5.1.0 needs 580), and Isaac Sim
+# aborts with `Failed to create any GPU devices`, so `--enable_cameras` cannot run. The NVIDIA
+# Vulkan ICD reaches the GPU through EGL/GBM when there is no display, and that path needs a
+# registered EGL vendor. Hosts whose driver was installed normally are unaffected, which is why
+# this only shows up on some providers.
+#
+# Verified on a Brev g6e.xlarge (driver 580.178.04, downgraded from 595): without this file
+# `vulkaninfo` reports ERROR_INCOMPATIBLE_DRIVER, with it `deviceName = NVIDIA L40S` and datagen
+# runs. Matches what this repository's isaac-lab-ex-ros2 image writes, which is why that image
+# renders on hosts where this one previously could not.
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
+    printf '%s\n' \
+      '{' \
+      '    "file_format_version" : "1.0.0",' \
+      '    "ICD" : {' \
+      '        "library_path" : "libEGL_nvidia.so.0"' \
+      '    }' \
+      '}' \
+      > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 
 ENV SHELL=/bin/bash
 
