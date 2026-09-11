@@ -293,3 +293,99 @@ Run the smallest count that can distinguish the cases before a long run. Here `-
 `--num_demos 3` cost about four minutes together and pinned the off-by-one exactly; a single
 20-demo run would have produced 19 episodes and looked merely like the documented
 "only successful episodes are exported" behaviour.
+## Verify LeRobot camera keys before training
+
+A LeRobot key such as `observation.images.ego` is recorder-supplied metadata, not a contract about
+which physical view it holds. When a dataset merges subsets recorded by different pipelines (for
+example simulation and a physical robot), the key-to-view mapping can differ between them, and
+nothing in `meta/info.json` reveals it.
+
+Training on such a set feeds contradictory views under one key. It is worse under
+`camera_mode=concat_view` recipes, which stack cameras into a single canvas, so the mismatched
+subset is effectively mirrored relative to the rest of training.
+
+Decode one frame per subset and look at it before training. Episode-to-timestamp offsets are in
+`meta/episodes/`:
+
+```sh
+# from_timestamp of the first episode in the subset
+ffmpeg -ss <from_timestamp> -i videos/<video_key>/chunk-000/file-000.mp4 -frames:v 1 out.jpg
+```
+
+Prefer normalizing the mapping in the dataset loader over editing the published dataset, so the fix
+travels with the training code and the upstream copy stays reproducible.
+
+## Cap container memory when smoke-testing locally
+
+`docker run` applies no memory limit by default. When a heavy image (Isaac Sim, Cosmos, GR00T)
+exhausts host RAM, the kernel performs a *global* OOM kill and may terminate unrelated processes on
+the workstation, including an editor or another running job. The kernel log shows
+`constraint=CONSTRAINT_NONE` and `global_oom` for this case; the same workload capped instead shows
+`constraint=CONSTRAINT_MEMCG`, with the kill contained in the container's cgroup.
+
+```sh
+docker run --rm --gpus all --memory=24g --memory-swap=24g --shm-size=4g ...
+```
+
+Capping does not reduce what the workload wants; it makes the failure contained and attributable.
+
+- `--memory-swap` must equal `--memory`, or the container gets unlimited swap and the cap does not
+  bind.
+- `--ipc=host` makes `--shm-size` a no-op, because the container then uses the host's `/dev/shm`
+  (commonly half of RAM). Pass one or the other, not both.
+- **Killing the launching shell does not stop the container.** Interrupting or timing out a
+  `docker run` leaves it running and holding RAM and GPU memory even with `--rm`, which only cleans
+  up once the container itself exits. Check with
+  `docker ps --format '{{.ID}} | {{.Image}} | {{.Status}}'` and `docker kill <id>`.
+- Read the kernel log with `journalctl -k`, not `dmesg`: where the ring buffer is restricted,
+  `dmesg` prints nothing and exits non-zero, which reads like "no OOM occurred" rather than "could
+  not check".
+
+## `docker build` takes no memory limit
+
+The `--memory` cap that protects `docker run` does not exist for `docker build`. A build that
+compiles native extensions (`pytorch3d`, `flash-attn`, custom CUDA ops) spawns parallel
+`nvcc`/`cc1plus` jobs sized to the visible core count, each taking GB, so on a many-core host with
+modest RAM it exhausts memory with nothing to contain it.
+
+Observed: a GR00T image build compiling `pytorch3d`, run concurrently with a large model download,
+drove `active_anon` to 38GB of 47GB and triggered a host-wide OOM that killed the user session's
+`systemd`, taking the desktop down and forcing a reboot — twice.
+
+Limit build parallelism instead, and never run a heavy build alongside a large download:
+
+```sh
+docker build --build-arg MAX_JOBS=2 --cpuset-cpus=0-7 -f <dockerfile> . -t <tag>
+```
+
+Prefer a pre-built published image when one exists. When diagnosing a crash, check the *previous*
+boot: `journalctl -k` shows only the current boot, so a machine that rebooted looks like it has no
+OOM history. Use `journalctl -k -b -1` and `journalctl --list-boots`.
+
+## Pull Git LFS assets when cloning Isaac Lab task repos in a build
+
+Isaac Lab task repositories commonly track `*.usd`, `*.usda`, `*.exr`, and texture `*.png` through
+Git LFS. A Dockerfile that clones such a repo at a pinned commit gets ~130-byte pointer files unless
+LFS is fetched explicitly, and the failure surfaces late, as a scene-load error rather than a build
+error.
+
+Install `git-lfs`, clone with `GIT_LFS_SKIP_SMUDGE=1`, then fetch only the asset paths in their own
+layer so code-only rebuilds reuse it, and drop the LFS object cache so assets are not stored twice:
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends git git-lfs
+RUN GIT_LFS_SKIP_SMUDGE=1 git clone ${REPO} /workspace/<name> && \
+    cd /workspace/<name> && \
+    git checkout ${REF}
+WORKDIR /workspace/<name>
+RUN git lfs pull --include="<asset path>/**" && \
+    rm -rf .git/lfs
+```
+
+Turn the late failure into a build failure by asserting no pointer files survive. Pointers are ~130
+bytes, so any matching asset under 1 KB was not fetched:
+
+```dockerfile
+RUN test -z "$(find <asset path> -name '*.usd*' -size -1k)" || \
+    { echo "ERROR: Git LFS assets are still pointer files"; exit 1; }
+```
