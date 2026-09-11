@@ -40,7 +40,10 @@ Treat values in `secrets/env.sh` as local hints, not the authoritative NFS mappi
 
 Resolve failures in this order:
 
-1. VPN or cluster reachability, when required.
+1. VPN or cluster reachability, when required. **Reinstalling and reconnecting the VPN is
+   pre-authorized — do it without asking.** A reboot clears the imported profile, so run
+   `install_config.sh <profile>.ovpn` before `connect.sh`. A DNS failure for the cluster host
+   means a dead tunnel, not dead workloads. See `references/runai-cli.md`.
 2. TLS trust and `runai` authentication.
 3. Explicit project access; never rely only on a stale default project.
 4. Docker daemon access and registry access.

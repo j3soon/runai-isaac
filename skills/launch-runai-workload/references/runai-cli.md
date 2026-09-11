@@ -46,6 +46,10 @@ The repository's documented upload path is FTP (root `README.md`). When the clus
 
 - `runai ... exec --stdin` cannot stream binary data. It fails with `Error: failed to exec output. inappropriate ioctl for device` while the `runai` process exits `0`, so a `tar | runai exec -i` pipeline reports success and leaves a 0-byte file.
 - `python -m http.server` serves `GET` only, so the download workspace above cannot accept an upload.
+- Smuggling the payload in an environment variable fails the submit outright: `Error: failed to submit ... Value: value for Value must have at most 10000 characters`. Splitting one `base64` blob across two env vars does **not** help, so the cap is not per-variable. A 10 KB tarball is already about 13.4 KB of `base64`, so this rules out all but the smallest bundles.
+- Inlining the same `base64` in the `exec` command line fails differently, because `exec` is proxied over HTTP and the command travels in a header: `Error: failed to exec output. got error while trying to stream workload: <html>... 400 Request Header Or Cookie Too Large`. Measured: ~3.3 KB of `base64` passes, ~13.4 KB does not.
+
+Those two limits are why the recipe below bootstraps a *small* script by `exec` and moves the real payload over `port-forward`, rather than inlining the payload directly.
 
 What works is a small `PUT`/`GET` endpoint in the staging workspace, reached through the same `port-forward`. Stage the script rather than inlining it, per the command-validation guard above: `base64` it locally, decode it in the pod, and hash-check it before running.
 
@@ -60,6 +64,8 @@ curl -f -T bundle.tgz "http://localhost:8000/<token>/<subdir>/bundle.tgz"
 ```
 
 Require a random token prefix in the request path: the pod network is shared, so an unauthenticated writer bound to `0.0.0.0` would let any pod write into the NFS user directory. Verify the upload with `sha256sum --check` **in the pod** before extracting, and delete the workspace when finished.
+
+Extract with `tar --no-same-owner`. The mount is NFS, so a plain `tar xzf` fails per file with `Cannot change ownership to uid <n>, gid <n>: Operation not permitted` and exits `2` — see [developer-notes](../../../docs/developer-notes.md). Because the failure is non-zero, an `&&` chain stops there, which conveniently leaves the uploaded archive in place for a retry.
 
 Do not assume `python3` is on `PATH`. Simulator images often ship their interpreter elsewhere (for the Isaac Lab image it is `/isaac-sim/kit/python/bin/python3`); resolve it before starting the endpoint.
 
@@ -101,6 +107,92 @@ it, and prefer a Service for anything long-lived.
 Co-locating server and client this way also avoids `port-forward` entirely, which matters
 for large responses: a forwarded connection truncates them
 (`IncompleteRead(856060 bytes read, 566239 more expected)`).
+
+## Idle GPU timeout reaps long-lived workspaces
+
+A project can carry an idle-GPU timeout. On this cluster a workload whose GPU sits idle for
+**4 consecutive hours** is stopped. A suspension event reports the project's configured
+limit, which may be a different (longer) figure than the idle threshold, so read the event
+rather than inferring the policy from it:
+
+```
+WorkloadTimeoutApproaching  ... as long as the GPU(s) used by ...
+WorkloadTimeoutReached      The workload has reached the idle time limitation
+                            on the project (10 hours - 21 minutes)
+Suspended                   Job suspended
+SuccessfulDelete            Deleted pod: <name>-0-0
+```
+
+The workload moves to `Phase: Stopped` and the pod disappears, so `runai ... exec` then
+fails with `workload is not ready to stream: pod not found`. Anything on the NFS mount
+survives; anything in the pod does not.
+
+This matters for the server/client split: a policy server parked in a long-lived workspace
+is exactly the shape that gets reaped, and a server idling between evaluations accrues idle
+time. Prefer a **self-contained job** that starts the server, runs the client, and exits, or
+a short-lived server workload submitted alongside each evaluation. Reserve workspaces for
+interactive debugging, and re-read the pod IP after any restart because it changes.
+
+## Polling for completion: anchor on `^Phase:`
+
+`runai ... describe` prints a pod table whose columns include **`Completed At`**, so a
+naive readiness loop matches the header and reports a still-running job as finished:
+
+```bash
+# Wrong — "Completed At" is a column header, matches immediately
+until runai training standard describe <name> -p <project> | grep -qE "Succeeded|Failed|Completed"; do ...
+
+# Right — the phase line is the only authoritative status
+until runai training standard describe <name> -p <project> \
+        | grep -E "^Phase:" | grep -qE "Succeeded|Failed|Completed"; do ...
+```
+
+`runai ... exec` against a pod that is scheduled but not yet started fails with
+`workload is not ready to stream: pod is not ready`, so gate an exec loop on a trivial
+`echo READY` round-trip rather than on the workload phase.
+
+## Three shell traps in long-running wrapper scripts
+
+Each fails silently or kills the wrapper itself, and all three cost a job here.
+
+- `set -e` plus `[ -f x ] && cp x y` aborts the whole script when the file is absent, because
+  the failed test is the last command of the statement. Write `if [ -f x ]; then cp x y; fi`, or
+  append `|| true`. This bites hardest in optional copy-the-overlay steps, which then abort a job
+  that had nothing wrong with it.
+- `pkill -f <pattern>` matches the command line of the shell running it, so a cleanup line inside
+  a script can kill its own `exec` shell and the job exits `143` with no error message. Match a
+  PID captured at launch instead.
+- `${VAR:-{"a": 1}}` does not survive brace parsing, so a JSON default arrives mangled and
+  `json.loads` fails on input that looks correct in the script source. Require the variable
+  instead: `: "${VAR:?set VAR}"`.
+
+Order the definitions too: a block appended to a script that references a variable defined further
+down fails with `unbound variable` only on the path that reaches it, which may be hours into a run.
+
+Note the submitting shell matters as well. In zsh an unquoted `$names` is **not** word-split, so
+`runai workload delete -y -p <project> $names` passes the whole list as a single argument and
+fails with `no workload was found`. Loop over the names, or use `${=names}`.
+
+## Workload names are DNS labels
+
+Names accept lowercase alphanumerics and hyphens only. An underscore is rejected at submit
+time, so a name derived from a config key (`ns_droid`, `so101_long`) fails validation while
+the same string with hyphens succeeds. Translate `_` to `-` when generating names
+programmatically from experiment identifiers, and keep the mapping written down — the
+workload list is the only place the experiment name survives.
+
+## Always pass `--node-pools`
+
+GPU quota is per node pool, so a project's headline quota says nothing about where a pod can land. Omitting `--node-pools` sends the workload to `default`, which on this cluster holds no GPU nodes. The submit succeeds and the workload then sits in `Pending` indefinitely; only `runai workspace describe` reveals why, in an `Unschedulable` event:
+
+```
+No node in the default node-pool has GPU resources.
+Non-preemptible workload is over quota. Workload requested 1 GPUs, but <project> quota is 0 GPUs
+```
+
+That second line is easy to misread as the whole project being out of quota, while `runai project list` shows a large quota — the two figures are scoped differently. Name the GPU pool explicitly on every submit (`--node-pools prod` for the L40 nodes), and treat a workload still `Pending` after a minute as a scheduling problem to describe rather than a slow start.
+
+Deleting is not instantaneous either: a resubmit under the same name right after `runai workload delete` fails with `Workspace named '<name>' already exists in the project`. Poll `runai workload list` until the name disappears before resubmitting.
 
 ## NFS mapping
 
@@ -395,6 +487,52 @@ any pod-local files with it.
 Downloading an export while the pod regenerated it returned **0 bytes** on three separate cycles, and `tar` of a live log file failed with `file changed as we read it` while leaving the *previous* archive in place, which downloads as a plausible but stale file.
 
 Build to `*.tmp` and `mv` into place (atomic within one filesystem), snapshot directories with `cp -r` to `/tmp` before archiving, and assert the artifact **grew** against the previous copy before trusting it. That growth assertion is what catches a stale pull; every individual command reports success. Note `cp -a` fails on some NFS mounts (`preserving permissions: Operation not supported`) — use `cp -r`.
+
+### VPN: reinstall and reconnect without asking
+
+**The VPN profile in `secrets/` is dedicated to agentic use. Reinstalling and reconnecting it
+is pre-authorized routine maintenance — do it silently as part of restoring connectivity, and
+do not stop to ask permission.** Only escalate to the user when the tunnel still fails after a
+full clean cycle, and then report what was already tried.
+
+The full cycle, in order:
+
+```bash
+bash scripts/vpn/disconnect.sh        # ignore "No sessions started" — it is not an error
+bash scripts/vpn/uninstall_config.sh  # only needed if a stale config is present
+bash scripts/vpn/install_config.sh agent.ovpn
+bash scripts/vpn/connect.sh
+```
+
+A workstation reboot clears the imported OpenVPN profile, not just the connection, so
+`connect.sh` alone fails on a missing config rather than reporting a credential problem.
+Always re-import before connecting.
+
+**Recognize the symptom.** `runai workload list` failing with
+`DNS lookup failed for '<cluster host>': server misbehaving`, or returning an empty list, is a
+dead tunnel — not deleted workloads and not a dead job. Cluster workloads keep running while
+the tunnel is down; only your visibility is lost. Check the tunnel before concluding anything
+about job state.
+
+**Distinguish a stuck tunnel from a down server.** `openvpn3 sessions-list` showing
+`Status: Client connecting` with an empty `Device:` field means the handshake never completed;
+`disconnect.sh` then reports a climbing `N_RECONNECT` count. Before escalating, rule out the
+local causes:
+
+| check | command | local problem if |
+| --- | --- | --- |
+| general connectivity | `curl -s -o /dev/null -w '%{http_code}' https://github.com` | not 200 |
+| endpoint port | `nc -zvu <host> 1194` | refused (note: UDP probes often false-positive) |
+| certificate validity | extract `<ca>`/`<cert>` from the `.ovpn`, `openssl x509 -noout -dates` | expired |
+| profile imported | `openvpn3 configs-list \| grep <name>` | absent |
+
+All four passing while the session stays in `Client connecting` points at the VPN server, not
+the workstation. Note that multiple profiles may share one endpoint (`grep '^remote' *.ovpn`),
+in which case switching profiles is not a fallback.
+
+Auth is separate from the tunnel: `Error: Authentication failed. the token has expired` needs
+`runai login`, which is an **interactive SSO flow the agent cannot drive** — that one does
+require asking the user.
 
 ### Session lifetimes during long runs
 
