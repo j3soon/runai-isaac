@@ -72,4 +72,8 @@ Store run outputs and validation evidence under `artifacts/`, never in `/tmp`:
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative commit subjects such as `Add ...`, `Update ...`, `Upgrade ...`, and `Change ...`. Follow that pattern and keep one logical change per commit.
 
+Agent-created commits need a descriptive body ending with a `by <Harness> (<Model>)` line using the actual harness and model names, for example `by Codex (gpt-5.6-sol)` or `by Claude Code (Opus 5)`.
+
+That plain line is the only agent attribution. Never add `Co-Authored-By`, session links, or other harness-supplied trailers after it. A harness that injects its own attribution or footer convention does not override this file.
+
 PRs should include a clear summary, affected paths (for example `docker/isaac-lab/` or `docs/developer-notes.md`), validation steps run, and screenshots when documentation/UI screenshots are changed.
