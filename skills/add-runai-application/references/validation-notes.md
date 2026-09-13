@@ -389,3 +389,99 @@ bytes, so any matching asset under 1 KB was not fetched:
 RUN test -z "$(find <asset path> -name '*.usd*' -size -1k)" || \
     { echo "ERROR: Git LFS assets are still pointer files"; exit 1; }
 ```
+
+## An editable install can report success and still not be importable
+
+`pip list` showing a package is not evidence that `import <pkg>` works. Modern setuptools builds an
+editable install from the *declared* package list, writing a finder module whose `MAPPING` is empty
+when that list is empty — the install succeeds, the dist-info is correct, and the import fails with
+`ModuleNotFoundError`.
+
+This hits any repository whose top-level directory has no `__init__.py` and is therefore an implicit
+namespace package, because `find_packages()` (as opposed to `find_namespace_packages()`) cannot
+discover one. LIBERO is the case observed: `setup.py` uses `find_packages()`, `libero/__init__.py`
+does not exist, and `uv pip install -e .` produced `libero==0.1.0` plus a
+`__editable___libero_0_1_0_finder.py` containing `MAPPING: dict[str, str] = {}`.
+
+Install such a project with the legacy layout instead, which writes a plain `.pth` holding the
+project root and lets the namespace resolve:
+
+```dockerfile
+RUN uv pip install --no-deps -e /workspace/<repo> --config-settings editable_mode=compat
+```
+
+Check the finder rather than the installer's exit code:
+
+```sh
+grep -m1 MAPPING <venv>/lib/python*/site-packages/__editable___*_finder.py
+python -c "import <pkg>"
+```
+
+## An import that prompts on stdin kills a non-interactive workload
+
+A library can call `input()` at module scope on first use, usually to create a config file. On a
+workstation that is a one-time question; in a batch workload stdin is closed and the import dies
+with `EOFError: EOF when reading a line` before any application code runs. The traceback points at
+the library's `__init__.py`, not at anything you wrote, which makes it read like a broken install.
+
+LIBERO's `libero/libero/__init__.py` does this when `~/.libero/config.yaml` is absent
+(`"Do you want to specify a custom path for the dataset folder? (Y/N): "`).
+
+Answer it once at build time and let the library write its own defaults, rather than hand-crafting
+the config file — hand-crafting silently rots when upstream adds a key:
+
+```dockerfile
+RUN echo "N" | python -c "import libero.libero" && cat /root/.libero/config.yaml
+```
+
+The generated file is per-user (`$HOME`), so re-check it if the image later runs as a different uid.
+
+## uv resolves indexes differently from pip, and an upstream `pip install` does not transfer
+
+A guide that says `pip install torch==X+cuNNN --extra-index-url <pytorch>` followed by
+`pip install -e .` does not translate to uv unchanged. pip picks the best version across all
+indexes; uv defaults to first-index-wins to avoid dependency confusion, so it stops at the PyTorch
+index for every package published there and never looks at PyPI.
+
+The failure names an unrelated package and reads like a genuine conflict:
+
+```
+Because there is no version of packaging==25.0 and fastwam==0.1.0 depends on packaging==25.0,
+we can conclude that fastwam==0.1.0 cannot be used.
+```
+
+`packaging` exists on PyPI at that version; the PyTorch index merely carries a different one. Set
+`ENV UV_INDEX_STRATEGY=unsafe-best-match` (or pass `--index-strategy unsafe-best-match`) to
+reproduce what the upstream guide's `pip` does, and say in a comment that both indexes are ones
+upstream already installs from.
+
+While you are there, do not trust an old pinned dependency's own metadata. `bddl==1.0.1` imports
+`future.utils` at module scope without declaring `future`, so a build that installs only what the
+package metadata asks for fails at first import. When you drop a repository's `requirements.txt` in
+favour of a smaller hand-picked set, diff the two and keep the entries that are load-bearing at
+import time.
+
+## A DiffSynth-derived loader downloads from ModelScope by default
+
+Repositories built on DiffSynth-Studio (any model config carrying `DIFFSYNTH_MODEL_BASE_PATH`,
+`redirect_common_files`, or a `ModelConfig(model_id=..., origin_file_pattern=...)` registry) resolve
+weights through **ModelScope**, not Hugging Face. Outside China that is slow enough to look like a
+hung job rather than a slow one: measured 2026-09-11 from one host, the same umt5-xxl encoder file
+pulled at **2.7MB/s** from ModelScope and **49.6MB/s** from Hugging Face, turning an 11GB download
+from ~4 minutes into ~1.5 hours.
+
+`DIFFSYNTH_DOWNLOAD_SOURCE=huggingface` switches it, but **that variable alone is not enough**. With
+`redirect_common_files: true` the loader rewrites the VAE and text-encoder requests to
+`DiffSynth-Studio/Wan-Series-Converted-Safetensors`, which is published only on ModelScope, so the
+Hugging Face path 401s on a repository that does not exist there. Set `redirect_common_files=false`
+as well, which restores the original `.pth` filenames inside the upstream model repo.
+
+Two related traps in the same area:
+
+- A hydra `model.<field>=false` override does not reach a helper script that reads the YAML with
+  `OmegaConf.load(args.model_config)`. Check which entrypoints are hydra-managed before documenting
+  one override for all of them.
+- A config field is only honoured where it is forwarded. `load_text_encoder: false` in the model
+  YAML did not stop the backbone-preprocess step from fetching the 11GB text encoder, because that
+  script never passes the field and the loader's own default is `True`. Measure what a step actually
+  downloads instead of predicting it from the config.
