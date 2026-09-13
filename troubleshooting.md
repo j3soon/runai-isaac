@@ -226,3 +226,67 @@ Node not ready.
 ```
 
 **Admin:** Can potentially be fixed with power-cycling. Need further investigation.
+
+## NFS mount fails with `Connection refused` on every node
+
+A workload stays in `Initializing` and its events show a `FailedMount` from the kubelet:
+
+```
+MountVolume.SetUp failed for volume "nfs-volume-0" : mount failed: exit status 32
+Mounting arguments: -t nfs <server>:<export> ...
+Output: mount.nfs: Connection refused
+```
+
+Read the error word for word. `Connection refused` means something answered and nothing is
+listening; a firewall that drops, or a dead route, gives a **timeout** instead. It is also not an
+export-path or permissions fault — a wrong export yields `access denied by server`.
+
+The pod keeps retrying, so the workload sits in `Initializing` indefinitely rather than failing.
+Capture the event, then delete it; leaving it queued only holds a scheduling slot.
+
+### Do not diagnose this from a workstation port scan
+
+The obvious next step is to probe the server's RPC ports over the VPN, and it will mislead you.
+Observed 2026-09-11 against two different servers on this cluster: a bash `/dev/tcp` connect to
+port `111` succeeded while `2049` and `20048` were refused, which reads exactly like "the host is
+healthy and only `nfsd` is dead". It is not safe to conclude that. An actual portmap `DUMP` call to
+the same open port `111` then **timed out on both servers** — so whatever accepted the TCP
+handshake was not rpcbind answering, and something in the path completes handshakes without
+forwarding. A TCP connect that succeeds is not evidence that the service behind it is alive.
+
+Probe with a call that requires a reply, not a connect:
+
+```sh
+rpcinfo -p <server>           # must list program 100003 (nfs) to mean anything
+showmount -e <server>         # exports, if mountd answers
+```
+
+Neither ships on a minimal workstation; install `rpcbind`/`nfs-common` rather than substituting a
+port scan.
+
+### Let the cluster node be the authority
+
+The kubelet's own `FailedMount` event is the measurement that counts, because it comes from the
+host that must actually mount. Test with a throwaway CPU-only workload carrying just the `--nfs`
+flag, and read the event rather than the pod logs — the pod never starts, so
+`runai ... logs` returns `workload is not ready to stream: pod is not ready`.
+
+When two unrelated servers fail identically from the same node, it is tempting to infer a common
+cause — a shared filer front-end, both addresses being virtual IPs on one appliance, or a
+network-policy change — and escalate. Before doing that, **try a different server address.**
+
+Observed 2026-09-11: six consecutive `Connection refused` mounts across two servers and two path
+depths looked conclusively like an outage, and the diagnosis was wrong. A third address on the same
+subnet mounted immediately and reported a healthy 27T filesystem. Nothing was broken; the addresses
+being tried were simply not the serving one — including the one registered as the project's own
+Run:ai NFS data-source asset.
+
+The lesson is about which variable to hold fixed. `Connection refused` is the kernel saying a host
+rejected the connection, which is a statement about *that address*, not about NFS in general. Once
+one server has refused every path you try, stop permuting the export path and change the server.
+And treat a registered Run:ai data source as a hint like any other: it can name a server that no
+longer serves, so it is not automatically more authoritative than an address a user hands you.
+
+Until it is restored, workloads that only read from the network and write container-local paths
+still run; anything mounting `/mnt/nfs` cannot start. Drop the `--nfs` flag to keep validating the
+parts that do not need it.
