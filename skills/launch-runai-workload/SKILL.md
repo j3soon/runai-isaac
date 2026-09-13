@@ -38,6 +38,8 @@ When the workload needs NFS, resolve the approved asset without exposing credent
 
 Treat values in `secrets/env.sh` as local hints, not the authoritative NFS mapping. Reject unresolved placeholders, and prefer the current Run:ai data-source server/export when the env file disagrees.
 
+A registered data source is still only a hint about *reachability*. It can name a server that no longer serves, so it does not outrank an address the user gives you. When a mount fails with `Connection refused` on every path tried against one server, change the server address rather than permuting the export path, and try any user-supplied address before concluding there is an outage — see [troubleshooting](../../troubleshooting.md).
+
 Resolve failures in this order:
 
 1. VPN or cluster reachability, when required. **Reinstalling and reconnecting the VPN is

@@ -4,6 +4,25 @@ These patterns target the repository's tested CLI 2.23 family. Run `runai versio
 
 Every Run:ai CLI submit command must include `--image-pull-policy Always`, including commands that use an immutable image digest. Verify this flag in the exact resolved command before executing it.
 
+**The CLI rewrites the quoting of `--command`, swapping your outer and inner quote characters.**
+Submitting `--command -- /run.sh "python -c 'import x; import y'"` stores and runs
+`/run.sh 'python -c "import x; import y"'`. The inner string therefore arrives double-quoted no
+matter which way round you wrote it, so you cannot fix this by choosing the other quote style.
+
+That matters because `/run.sh` word-splits its argument unless given `--shell`: the inner command
+reaches `python` as `-c` `"import` `x;` ... and dies with
+`SyntaxError: unterminated string literal`, while the workload reports only a generic backoff
+failure. **Pass `--shell` whenever the command contains a quoted string, `&&`, a pipe or a
+redirect** — it makes `/run.sh` `eval` the argument, which survives the rewrite:
+
+```bash
+--command -- /run.sh --shell "python -c 'import torch; print(torch.__version__)'"
+```
+
+Check the rewrite in the `Command:` line of `runai ... describe` *before* waiting on a pull; on a
+large image the failure otherwise costs a full image pull to discover. Note `describe` returns no
+`Command:` line at all while the workload is still in `Creating`.
+
 Do not nest double quotes inside a `--command` argument. They are flattened before reaching the container, so `--command -- /run.sh "python -c \"import x\""` arrives as broken shell and the pod fails on a syntax error while still reporting a generic backoff-limit message. Use single quotes for the inner string, or keep the inner command quote-free. Check the resolved command in the `runai-submit-command` annotation of `runai ... describe` when a job fails immediately.
 
 Every GPU submit command must also include an explicit node pool; do not trust the CLI default. On this repository's configured cluster, pass `--node-pools prod` for user workloads. Node administration and the `dev` pool belong to the `admin-debug-runai-node` skill.
@@ -557,3 +576,51 @@ runai workspace suspend <name> --project <project>
 runai workspace resume <name> --project <project>
 runai training standard suspend <name> --project <project>
 ```
+
+## Pass `--large-shm` to any workload with PyTorch DataLoader workers
+
+A multi-GPU training job that loads, builds the model, initializes the optimizer and then dies on an
+arbitrary rank with nothing but
+
+```
+scripts/train.py FAILED
+Root Cause (first observed failure):
+  rank : 3 (local_rank: 3)
+  exitcode : 1
+  traceback : <N/A>
+```
+
+is very often out of **shared memory**, not GPU memory. The DataLoader passes decoded tensors between
+worker processes through `/dev/shm`, which Kubernetes defaults to 64MB, and a video pipeline exhausts
+that immediately. The real exception is
+`RuntimeError: DataLoader worker (pid N) is killed by signal: Bus error. It is possible that
+dataloader's workers are out of shared memory.`
+
+`runai ... submit --large-shm` fixes it. `num_workers=0` also avoids it, at a throughput cost.
+
+Observed 2026-09-11: four consecutive FastWAM training attempts were misdiagnosed as CUDA OOM and
+"fixed" by shrinking the batch, which changed nothing, because the fault was never on the GPU.
+
+## Get the real traceback: `torch.distributed` hides non-rank-0 stderr
+
+`ChildFailedError` prints a summary naming the failing rank and its exit code, and **not** that rank's
+Python exception. Rank 0's traceback appears in the pod log; every other rank's does not. Two habits
+make this tractable:
+
+- **Tee the job's output to the NFS mount.** Run:ai replaces a failed pod, and `runai ... logs` then
+  shows the *replacement* — the failing pod's log is gone, and `--previous` returns
+  `previous terminated container ... not found`. A log on NFS survives.
+  `/run.sh --shell "<command> 2>&1 | tee /mnt/nfs/<user>/<job>.log"`.
+- **Read that log with `grep -a`.** Progress bars leave control characters, so the file is detected as
+  binary and plain `grep` prints only `binary file matches`, which reads like an empty result.
+  `tr -c '[:print:]\n' ' ' < log` is a good first filter before grepping.
+
+Reproducing at `nproc_per_node=1` also surfaces the exception directly, but beware that a single-GPU
+run can fail *earlier and differently* — a ZeRO partition that fits across 8 ranks will not fit on
+one, so the 1-GPU failure may be a distinct fault rather than the one being chased.
+
+## `/run.sh` traces every command to stderr
+
+`scripts/docker/run.sh` starts with `#!/bin/bash -ex`, so the resolved command is echoed several
+times before it runs. For a diagnostic workload whose output you intend to read, start the command
+with `set +x;` under `--shell`, or the few lines you want are buried in trace output.
