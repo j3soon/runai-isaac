@@ -49,6 +49,7 @@ Only skip the guide if you are fully confident in what you're doing. Proceed at 
 | [j3soon/runai-isaac-gr00t:n1.6](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.6](./docker/isaac-gr00t-n1.6/README.md) |
 | [j3soon/runai-isaac-gr00t:n1.7](https://hub.docker.com/r/j3soon/runai-isaac-gr00t) | [Isaac GR00T N1.7](./docker/isaac-gr00t-n1.7/README.md) |
 | [j3soon/runai-lerobot-gpu:0.4.4](https://hub.docker.com/r/j3soon/runai-lerobot-gpu) | [LeRobot GPU](./docker/lerobot-gpu/README.md) |
+| [j3soon/runai-fastwam:latest](https://hub.docker.com/r/j3soon/runai-fastwam) | [FastWAM](./docker/fastwam/README.md) |
 
 See [the Applications index](./docs/applications.md) for more example applications.
 
