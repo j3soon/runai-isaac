@@ -183,6 +183,8 @@ We take the PyTorch MNIST training code as an example.
 
 3. Upload your dataset and code to storage node through FTP.
 
+   > FTPS may be deprecated in the future, superseded by SSH/SCP through a CPU-only Run:ai workspace. See [Copying files with SSH/SCP](skills/launch-runai-workload/references/runai-cli.md#copying-files-with-sshscp).
+
    This could be done by either [FileZilla](https://filezilla-project.org/download.php?show_all=1) or `lftp`.
 
    > Note that some FileZilla installer [may contain adware](https://www.reddit.com/r/sysadmin/comments/mdg1rq/comment/gs9dc9v). Make sure the name of the installer does not container the word `sponsored`.

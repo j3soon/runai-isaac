@@ -43,9 +43,40 @@ runai workload list --project <project> --json
 `global.update.auto: true` lets the CLI silently self-upgrade mid-session (observed 2.23.34 -> 2.25.27 within one session), so the command contract can change between two commands in the same shell. Re-check `--help` after any run that spans an upgrade.
 Deleting requires `-y` in a non-interactive shell, or the command aborts with `could not open a new TTY: open /dev/tty`. `runai workload delete -y -p <project> <name>...` accepts several names, but pass them as separate arguments; a single argument holding space-separated names fails with `no workload was found`. `runai workspace delete` has no `-y`, so use `runai workload delete` for both types. Deletion is irreversible and removes the pod logs, so confirm the resolved name list against `runai workload list` first.
 
+## Copying files with SSH/SCP
+
+This is the preferred way to move files on and off `/mnt/nfs`. FTPS (root `README.md`) still works but may be deprecated. Run a CPU-only workspace from a stock image, with sshd listening only inside the pod, and reach it through `port-forward`:
+
+```bash
+runai workspace submit <username>-ssh --project <project> --node-pools <cpu-pool> \
+  --image ubuntu:24.04 --image-pull-policy Always \
+  --cpu-core-request 1 --cpu-memory-request 2G \
+  --nfs "server=<server>,path=<export>,mountpath=/mnt/nfs,readwrite" \
+  --command -- bash -c 'apt-get update && apt-get install -y openssh-server rsync && passwd -d root && mkdir -p /run/sshd && exec /usr/sbin/sshd -D -e -o ListenAddress=127.0.0.1 -o Port=2222 -o PermitRootLogin=yes -o PermitEmptyPasswords=yes'
+runai workspace port-forward <username>-ssh --project <project> --port 2022:2222 &
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+rsync -rlt -P -e "ssh $SSH_OPTS -p 2022" ./data/ root@localhost:/mnt/nfs/<username>/data/
+scp $SSH_OPTS -P 2022 root@localhost:/mnt/nfs/<username>/out.pt .
+```
+
+sshd is up about a minute after submit, once `Server listening on 127.0.0.1 port 2222.` appears in the workspace logs. SFTP clients such as FileZilla or WinSCP also work against `localhost:2022`, user `root`, with an empty password.
+
+- **Leave sshd on `127.0.0.1`. That binding is what makes the empty password acceptable.** `port-forward` dials the pod's loopback, and Run:ai authenticates it, so it is the only way in. The pod network is shared, so an empty-password sshd on `0.0.0.0` (or behind a NodePort) would give every pod on the cluster root access to the lab's NFS export.
+- **CPU-only means no `--gpu-devices-request` and a CPU-capable node pool.** Do not place it on a GPU pool without the cluster admin's permission (root `README.md`, tip 5). The CLI's `default` pool may accept it; check the cluster notes.
+- **Use `rsync -rlt`, not `rsync -a`.** The export squashes root, so `-a` fails per file with `chown ... Operation not permitted` and exits `23` after copying the data. This is the same cause as `tar --no-same-owner` below. Files land owned by the squash uid/gid either way.
+- **Expect a slow link that sometimes drops.** Measured with 1 GiB uploads: 2.6–11 MB/s, varying between runs; downloads ran at ~24 MB/s. `scp`, `scp -O`, and `rsync` performed identically on the same run, so the limit is the forward, not the protocol. In five uploads of 256 MiB or more, the forward died once mid-transfer, with `Error: port-forward command failed. got error while trying to stream workload: Bad Gateway`. The pod was unaffected. Restart the forward and re-run the same `rsync -P` (`--partial --progress`). It keeps the partial file and sends only the remainder, though no resume after a real drop has been exercised yet. The ~55-minute forward lifetime under "Session lifetimes" also applies. For tens of GB, ask the cluster admin about direct storage access instead.
+- **Default to `rsync -rlt -P`.** It sends only new or changed files on a re-run, and `-P` keeps a partial file so an interrupted transfer can be resumed. It was as fast as `scp` in the measurements below. Use `scp` for a one-off single file, and `scp` or an SFTP client where `rsync` is unavailable (typically Windows). `--delete` mirrors the README advice to remove stale files, but a wrong destination path deletes there, so run it with `--dry-run` first.
+- Verify large transfers with `sha256sum` on both ends.
+- Pick a free local port. `2222` is often already taken on a workstation, and `port-forward` then fails with `bind: address already in use`. Each new pod generates fresh host keys, which is why the example skips known-hosts checking for this loopback-only target.
+- In zsh, `$SSH_OPTS` is not word-split. Run the commands from bash, or use `${=SSH_OPTS}`.
+- A non-interactive `ssh` reads stdin. Inside a heredoc or loop, it swallows the rest of the script. Pass `-n` or `</dev/null`.
+- The workspace can run in the background for as long as transfers are needed. It holds no GPU, so the idle-GPU timeout below should not reap it, though that is not yet measured. Delete it when it is no longer needed.
+
+The HTTP fallbacks below predate this recipe. Keep them for images without network access to install sshd.
+
 ## Copying files off the cluster
 
-When FTP is unconfigured and the workstation has no NFS client or passwordless `sudo`, retrieve outputs through a short-lived workspace:
+When neither the SSH workspace above nor FTP is available and the workstation has no NFS client or passwordless `sudo`, retrieve outputs through a short-lived workspace:
 
 ```bash
 runai workspace submit <name> --project <project> --node-pools <pool> \
@@ -61,7 +92,7 @@ Verify the copy with `sha256sum` against a checksum taken in-cluster, and delete
 
 ## Copying files onto the cluster
 
-The repository's documented upload path is FTP (root `README.md`). When the cluster's FTP credentials are unprovisioned — `secrets/env.sh` still holding `<FTP_USER>` / `<FTP_PASS>` — and the workstation has no NFS client or passwordless `sudo`, two obvious substitutes do not work:
+Prefer the SSH workspace above. The repository's original documented upload path is FTP (root `README.md`). When the cluster's FTP credentials are unprovisioned — `secrets/env.sh` still holding `<FTP_USER>` / `<FTP_PASS>` — and the workstation has no NFS client or passwordless `sudo`, two obvious substitutes do not work:
 
 - `runai ... exec --stdin` cannot stream binary data. It fails with `Error: failed to exec output. inappropriate ioctl for device` while the `runai` process exits `0`, so a `tar | runai exec -i` pipeline reports success and leaves a 0-byte file.
 - `python -m http.server` serves `GET` only, so the download workspace above cannot accept an upload.

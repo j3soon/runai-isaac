@@ -84,6 +84,8 @@ Before the first real submission, state all of the following and obtain explicit
 
 Run:ai stdout/stderr logs are useful operational evidence but are not a durable artifact contract. When logs must survive workload deletion or control-plane retention, configure the application to write log files below the confirmed NFS user directory and verify them like checkpoints.
 
+To move files on or off NFS, prefer the SSH/SCP workspace in [references/runai-cli.md](references/runai-cli.md) ("Copying files with SSH/SCP") over FTPS, which may be deprecated.
+
 For this repository's cluster convention, NFS is mounted at `/mnt/nfs`, and user-owned data belongs under `/mnt/nfs/<username>`. Do not assume the lab export or username; derive and verify them.
 
 For custom workloads, when Docker is available, validate the exact container mount path. Skip this local image test for repository-provided applications unless the user explicitly requests it:
@@ -97,7 +99,7 @@ For custom workloads, when Docker is available, validate the exact container mou
   [--command '<one-step smoke command>']
 ```
 
-On Run:ai, write a uniquely named probe below `/mnt/nfs/<username>/.runai-probes/`, let the pod exit, then verify the same file independently through a later workload, FTP, or authorized SSH. Reading it only inside the writer pod is insufficient. Remove only the probe created for the test after verification.
+On Run:ai, write a uniquely named probe below `/mnt/nfs/<username>/.runai-probes/`, let the pod exit, then verify the same file independently through a later workload, the SSH transfer workspace, or FTP. Reading it only inside the writer pod is insufficient. Remove only the probe created for the test after verification.
 
 ## 5. Validate custom workloads locally in proportion to capability
 

@@ -1,7 +1,8 @@
 """Minimal PUT/GET file endpoint, run inside a Run:ai pod and reached via port-forward.
 
 Moves files on and off /mnt/nfs when FTP is unprovisioned, since `runai ... exec --stdin`
-cannot stream binary data. See references/runai-cli.md for the full recipe.
+cannot stream binary data. Prefer the SSH/SCP workspace; this is the fallback for when sshd
+cannot be installed. See references/runai-cli.md for both recipes.
 
 Usage: <python> upload_server.py <root-dir> <token> [port]
 
