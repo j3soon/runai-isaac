@@ -18,6 +18,53 @@ Pod bound successfully to node <NODE_NAME>
 
 and report to admin.
 
+Despite the wording, this is usually **not** an NVLink-fabric fault. The device plugin probes
+NVLink state during `GetPreferredAllocation` on every node, including nodes whose GPUs have no
+NVLink at all; on a healthy such node the probe returns "not supported" cleanly. `GPU is lost`
+means the named device had dropped off the PCIe bus at that moment, and NVLink is only where the
+probe happened to fail first. Confirm which it is from the node itself: `nvidia-smi topo -m`
+showing only `PIX`/`SYS` links and `nvidia-smi topo -p2p n` returning `NS` for every pair means
+the hardware has no NVLink to fault, so treat the report as a bus-drop.
+
+The condition can also clear on its own across a reboot or power-cycle, in which case the node
+admits a full-GPU workload again. Do not read that as the node being healthy: the comms diagnostic
+below passed completely on a node whose GPU then died under sustained load. Record when the fault
+was observed and whether the node was restarted in between, and run `gpu-burn` before concluding
+the report was spurious.
+
+**Admin:** The comms diagnostic does not detect this fault. On a node that had reported
+`GPU is lost`, nvbandwidth's 86 test groups, nccl-tests, aggregate ECC counters, remapped-row
+state and PCIe link width were all clean with all eight GPUs enumerated; a 300-second `gpu-burn`
+then dropped one GPU out of NVML and it did not return when the load ended. Confirm the drop with:
+
+```sh
+nvidia-smi --query-gpu=index --format=csv,noheader | wc -l   # fewer than expected
+ls /proc/driver/nvidia/gpus/ | wc -l                          # still the full count
+```
+
+The kernel keeps the PCI device node after NVML loses the device, and that split is what makes the
+device plugin emit `GPU is lost`. Confirm the fault and its layer from the node's own kernel log,
+which names the UUID and board serial outright:
+
+```sh
+sudo dmesg -T | grep -iE "xid|fallen off the bus|link down|card not present|aer_layer"
+```
+
+```
+NVRM: Xid (PCI:0000:1c:00): 79, pid=..., name=gpu_burn, GPU has fallen off the bus.
+pcieport 0000:18:03.0: pciehp: Slot(3): Link Down
+pcieport 0000:18:03.0: AER: aer_layer=Physical Layer, aer_agent=Receiver ID
+```
+
+`Xid 79` with a Physical Layer AER is conclusive hardware evidence — reseat the card and riser, then
+RMA against the board serial. `Xid 154` (`Node Reboot Required`) fires on **every** GPU on the node,
+so reboot before returning even a partially-working node to service. Record the
+`nvidia-smi --query-gpu=index,uuid,serial,pci.bus_id --format=csv` map *before* loading the node and
+identify the failed GPU by UUID or serial — the survivors renumber when one drops, so indices are
+ambiguous across the failure. Note also that `gpu-burn`'s closing `GPU n: OK` lines are driven by the
+error counter and report a dead GPU as `OK`; read its per-sample `Gflop/s` column instead, where the
+failed device reads `0` with its temperature stuck at idle.
+
 **Admin:** Isolate the node:
 
 ```sh
@@ -170,11 +217,9 @@ runai workspace exec "${WORKSPACE_NAME}" \
 NFS_PROBE_ID="${NODE_NAME}-${WORKSPACE_NAME}-$(date +%s)-$$"
 NFS_PROBE="${NFS_MOUNT_PATH}/.runai-nfs-check-${NFS_PROBE_ID}"
 NFS_MARKER="nfs-ok-${NFS_PROBE_ID}"
-printf '%s\n' "${NFS_MARKER}" |
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
-  --stdin \
-  -- tee "${NFS_PROBE}" >/dev/null
+  -- bash -c "printf '%s\\n' '${NFS_MARKER}' > '${NFS_PROBE}'"
 runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
   -- grep -Fqx -- "${NFS_MARKER}" "${NFS_PROBE}"
@@ -182,6 +227,11 @@ runai workspace exec "${WORKSPACE_NAME}" \
   --project "${RUNAI_PROJECT}" \
   -- rm -f "${NFS_PROBE}"
 ```
+
+Write the probe from a shell inside the container rather than piping into
+`runai ... exec --stdin`. The `--stdin` form fails with
+`Error: failed to exec output. inappropriate ioctl for device`, so the probe never
+reaches the mount.
 
 Then select the workspace in the Run:ai UI and use `CONNECT > Jupyter`.
 
