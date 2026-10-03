@@ -503,6 +503,53 @@ References:
 - [关于nginx-ingress-controller中worker参数的差异分析](https://zhuanlan.zhihu.com/p/359700475)
 - [追踪nginx ingress最大打开文件数问题](https://ieevee.com/tech/2019/09/29/ulimit.html)
 
+### Workloads Stuck in Pending Despite Free GPUs
+
+Workloads may stay `Pending` for a long time (minutes to hours) even when there are free GPUs, while others start normally. The stuck pods have no events, no conditions, and no `pod-group-name` annotation:
+
+```sh
+kubectl get pods -n runai | grep pod-grouper
+```
+
+Observe that `pod-grouper` is in `CrashLoopBackOff` with last state `OOMKilled`.
+
+The `pod-grouper` creates a PodGroup for every workload pod, and the Run:ai scheduler ignores pods without one. It caches all pods in the cluster (including `Completed`/`Error` ones), so its default `200Mi` memory limit is exceeded when many workloads have been submitted (in our case, ~1,500 pods on 20 nodes). `binder` has the same `200Mi` default.
+
+Apply the following patch to raise the resources of the scheduling services (based on the `Small` tier in the [scaling guide](https://run-ai-docs.nvidia.com/self-hosted/2.25/infrastructure-setup/procedures/scaling)). The limits are set to `2Gi` to avoid lowering the default limits of the schedulers:
+
+```sh
+cat > runai_cluster_scheduling_services.yaml <<'EOF'
+clusterConfig:
+  global:
+    schedulingServices:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+EOF
+helm upgrade runai-cluster runai/runai-cluster -n runai --version "<VERSION>" --reuse-values -f runai_cluster_scheduling_services.yaml
+```
+
+> `<VERSION>` is the currently installed version (see `helm list -n runai`), such as `2.25.27`.
+
+Verify the patch is applied and the stuck pods get a PodGroup:
+
+```sh
+kubectl get runaiconfig runai -n runai -o yaml | grep -A8 schedulingServices
+kubectl get pods -n runai | grep -E 'pod-grouper|binder'
+kubectl get podgroups -A | grep <WORKLOAD_NAME>
+```
+
+References:
+
+- [NVIDIA Run:ai at Scale](https://run-ai-docs.nvidia.com/self-hosted/2.25/infrastructure-setup/procedures/scaling)
+- [NVIDIA Run:ai Services Resource Management](https://run-ai-docs.nvidia.com/self-hosted/2.25/infrastructure-setup/advanced-setup/cluster-config)
+- [OOMKilled cause cluster-wide outages](https://github.com/NVIDIA/KAI-Scheduler/issues/227)
+- [Many pods and large environment variables can lead to OOM](https://github.com/NVIDIA/KAI-Scheduler/issues/1634)
+
 ## Distributed Training
 
 Install Kubeflow Training Operator and MPI Operator following slightly modified commands from [the docs](https://run-ai-docs.nvidia.com/saas/getting-started/installation/install-using-helm/system-requirements#distributed-training):
