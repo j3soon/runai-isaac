@@ -102,7 +102,7 @@ Sorted by price:
 >
 > Adding cameras fails outright. `Isaac-Cartpole-RGB-Camera-Direct-v0 --headless --enable_cameras --num_envs 16` never finished environment setup and was killed at a 450s timeout, with PhysX additionally falling back to software (`GPU solver pipeline failed, switching to software`).
 >
-> Those August 2026 GCP hosts lacked NVIDIA graphics libraries. A fresh GCP L4 later passed camera-enabled AICapstone datagen with the full 580 driver stack; that result does not revalidate this ROS 2 camera task. See the [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md#provider-choice-for-rendering-workloads) for details.
+> Those August 2026 GCP hosts lacked NVIDIA graphics libraries. A fresh GCP L4 passed this ROS 2 camera task with the saved 2.3.2 Launchable on 2026-10-20. See the [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md#saved-232-ros-2-launchable-validation-2026-10-20) for details.
 
 VRAM is the size Brev's instance search reports; `nvidia-smi` shows slightly less usable memory (for example 15360 MiB on the T4, 46068 MiB on the `g6e` L40S).
 

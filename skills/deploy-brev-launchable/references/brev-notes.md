@@ -636,6 +636,18 @@ collector's `json.loads(stdout)` fail even after its dataset checks had passed d
 <image> ...` so stdout contains the requested payload. Preserve raw output and the probe's
 exit code when diagnosing parsing failures; a collector error is not a workload result.
 
+### Frame the recorded scene before asserting on image variance
+
+Isaac Lab 2.3.2's RGB Cartpole task defaults to a viewer at `(20, 20, 20)`.
+With only 32 environments, its video shows tiny cartpoles on a nearly uniform
+floor. The October saved-Launchable test decoded valid videos but initially
+rejected them with a whole-frame standard-deviation threshold. Inspect a frame
+before attributing that check to a GPU failure. For a useful smoke-test video,
+frame environment 0 explicitly with `env.viewer.origin_type=env`, an eye near
+`[3.0,3.0,3.0]`, and a target near `[0.0,0.0,2.0]` (the cartpole's spawn height).
+These are workload recording options, not changes to the saved Launchable.
+Keep the initial output and the corrected recording when retrying the check.
+
 ### Check services, then exercise the GPU
 
 All five services can answer while Isaac Sim cannot initialize, since Kit additionally
@@ -771,3 +783,76 @@ The sweep reproduced the AWS apt block, Crusoe holds/file collision, Lambda rebo
 An additional fresh 8-vCPU GCP deployment with the CDI repair reached `ready` and passed the same camera workload without manual recovery: two episodes / 1010 frames in 492s. Final-script reruns on AWS and both 8-vCPU GCP VMs preserved their boot IDs, package holds, and image IDs while NVIDIA Vulkan remained healthy.
 
 This covers one suitable instance per single-GPU provider, with an extra GCP CPU configuration. Launchpad and SFCompute exposed only multi-GPU choices in the filtered catalog and were outside this budgeted sweep; shadeform coverage is the Massed Compute backend. Episode counts vary with domain randomization and the [final-episode export bug](../../../docker/hcis-lab-aicapstone/README.md#--num_demos-n-exports-only-n-1-episodes).
+
+## Validate the Saved Launchable Without Replacing Its Script
+
+Use `brev create <test-name> --launchable <id> --type <instance-type> --detached`
+for a provider sweep of the maintained Launchable. Change only the test name and
+instance selection; omit `--startup-script`, `--param`, disk edits, and Compose
+patches. The CLI resolves the Launchable's saved lifecycle script into the create
+request itself, so an inline script in the resulting API payload does not imply
+that the tester replaced it. Preserve that request and compare its script with
+`GET /api/launchable/lifecycle-script?envId=<id>&scriptId=<script-id>`.
+
+On the VM, Brev writes both `/opt/oncreate_lifecycle_script_<id>.sh` (its wrapper)
+and `/opt/oncreate_lifecycle_script_user_<id>.sh` (the user's saved script). Hash
+the **user** file when verifying an unchanged deployment; concatenating both files
+cannot match the saved script. Keep the Launchable's default disk request even
+when the selected cloud supplies a fixed disk size, and report the actual size.
+
+Availability is a snapshot: on 2026-10-20 at about 13:07 UTC, AWS GPU types were
+absent from both the public and organization catalogs, despite appearing earlier
+that day. Record an unavailable provider separately from a failed driver test;
+never substitute a previous hourly price for a current quote.
+
+Avoid launching several CLI deletion processes at once: the CLI performs multiple
+organization and workspace lookups per delete. Five concurrent deletes in this
+test all failed with `rate limit exceeded` before deleting anything. Check each
+result and inventory; use sequential deletes or the documented single-request
+REST delete for recorded test IDs, and keep polling until those IDs disappear.
+
+## Saved 2.3.2 ROS 2 Launchable Validation (2026-10-20)
+
+After the maintainer saved the fix, the repository's 2.3.2 Launchable passed on
+five available single-GPU providers. Deployments used `--launchable` and only
+changed the instance selection and test name. No startup-script override,
+parameter override, manual setup rerun, Compose patch, or manual reboot was used.
+The saved script and every executed user script had SHA256
+`3096bd469a92f3d23e77de0dfa719e6cd590f832b4b86d87fe0fd8f85ae6c239`.
+All pulled `j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy`, digest
+`sha256:4c1dafafda55e5c1e84457031e514afe58057749bc7bc3c4f579d77375acae06`.
+
+| Cloud | Instance | Loaded driver | First observed ready | Result |
+| --- | --- | --- | ---: | --- |
+| GCP | `g2-standard-4:nvidia-l4:1` | 580.178.04 | ~19 min | pass |
+| shadeform (Massed Compute) | `massedcompute_L40S` | 580.126.09 | ~8 min | pass |
+| Lambda | `gpu_1x_a10` | 580.119.02 | ~14 min | pass |
+| Crusoe | `l40s-48gb.1x` | 580.178.04 | ~11 min | pass |
+| Nebius | `gpu-l40s-a.1gpu-8vcpu-32gb` | 580.173.02 | ~20 min | pass |
+
+Each pass required all five identified services (JupyterLab, VS Code, noVNC, VNC,
+container SSH), host/container GPU checks, NVIDIA Vulkan, an active NVIDIA GPU
+in Kit's log, ROS 2 Jazzy pub/sub, three iterations of `Isaac-Cartpole-v0` with
+512 environments, and three iterations of `Isaac-Cartpole-RGB-Camera-Direct-v0`
+with 32 environments. Each final camera video decoded all 61 frames, and its
+sampled application-recorded image was inspected. GCP's cold camera startup took
+about ten minutes, mostly shader compilation; a 450-second timeout would have
+rejected this working configuration. No CDI ordering cycle appeared in the five
+passing boots. GCP, Crusoe, and Lambda rebooted automatically; shadeform and
+Nebius kept their existing 580 drivers.
+
+The default disk request stayed at 256GiB. Crusoe, shadeform, and Lambda supplied
+fixed 128GB, 625GB, and 1400GB disks respectively. AWS GPU types were absent from
+both catalogs and repeated later searches, so this saved-Launchable sweep does
+not validate AWS. Launchpad, OCI, and SFCompute exposed only multi-GPU choices
+in the filtered catalog and were excluded from the budgeted sweep.
+
+The first shadeform and Crusoe recording checks rejected the wide default viewer
+as described above. Crusoe passed a recording retry on the same untouched VM;
+shadeform passed a fresh identical Launchable deployment. Initial results remain
+in the evidence. This validates the ROS 2 Launchable, including a camera workload;
+it does not repeat AICapstone's cup-stacking datagen inside this different image.
+Raw evidence is under
+`artifacts/brev-saved-launchable/raw/evidence/defaults/20261020t131000z/`.
+All six test VMs, including the first shadeform attempt, were confirmed absent
+from the final inventory. Estimated compute/storage cost was $2.82.
