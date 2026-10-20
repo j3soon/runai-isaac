@@ -11,7 +11,7 @@ create.
 
 Read [references/brev-notes.md](references/brev-notes.md) before the first deployment. It
 records the measured timeline and the failure modes that have each produced a wrong
-conclusion before: a healthy mid-setup instance read as broken, a provider status field
+conclusion before: a healthy mid-setup instance read as broken, a Brev build-status field
 mistaken for readiness, and an SSH path that cannot work.
 
 ## 1. Establish the deployment contract
@@ -54,6 +54,18 @@ mistaken for readiness, and an SSH path that cannot work.
 - Editing the repository's setup script does not change an existing Launchable. The
   Launchable holds its own copy, so a script change must be pasted into the console
   before it can be tested.
+- Keep setup scripts self-contained: explain the affected provider/version, failure
+  symptom, and workaround inline. Record sweep provenance, validation history, and
+  evidence locations in the application guide or `references/brev-notes.md`; do not
+  add script comments that recount a test campaign or redirect readers to agent skills.
+  Attribute failures explicitly to the observed cloud and component (for example,
+  AWS DLAMI, Crusoe's driver holds, or NVIDIA Container Toolkit's drop-in), rather
+  than saying "some providers" or "vendors".
+- Write application READMEs for the maintained Launchables, assuming their current
+  setup fixes are already included. Keep new guidance concise and changes localized;
+  preserve existing sections and tables. Put new failure analysis, script-migration
+  instructions, and investigation history in `references/brev-notes.md` rather than
+  rewriting or removing existing documentation to shorten the deployment flow.
 
 ## 4. Wait without intervening
 
@@ -64,7 +76,7 @@ script's own reboot.
 
 - Watch the setup script's phase file rather than inferring from symptoms. Wait for the
   phase the unit writes after the application is actually up.
-- Treat the provider's build/status field as a start signal, not a readiness signal; it
+- Treat Brev's build/status field as a start signal, not a readiness signal; it
   reports success well before the setup script finishes.
 - A partially pulled image is invisible to `docker images`. An empty list is not evidence
   that nothing is happening; check for running work instead.

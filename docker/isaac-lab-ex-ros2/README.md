@@ -46,7 +46,7 @@ Brev provides four runtime modes: **VM Mode**, **Single Container**, **Docker Co
 
 This matters for reproducibility across older Isaac releases. [Isaac Lab 2.3.2 supports Isaac Sim only through 5.1.0](https://github.com/isaac-sim/IsaacLab/blob/v2.3.2/README.md), and our Isaac Sim 5.1.0 workload fails with NVIDIA driver 595. NVIDIA tested Isaac Sim 5.1.0 with Linux driver [580.65.06](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/requirements.html), so its setup script installs Ubuntu's packaged 580 driver. It then downloads the version-specific Compose file from this repository's `main` branch, pulls the image, enables the application as a systemd service, and schedules a reboot. VM Mode prevents a provider driver upgrade from silently making preserved 2.3.2 or 5.1.0 containers unusable.
 
-Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instead. Brev's base image already ships 595, so that setup script normally installs no driver and skips the reboot, leaving only the image pull.
+Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instead. The tested AWS base already ships 595, so that setup script skips driver installation and reboot there, leaving only the image pull.
 
 > The 2.3.2 deploy takes about 30 minutes and looks broken until its reboot. See the [`deploy-brev-launchable` skill](../../skills/deploy-brev-launchable/SKILL.md) and its [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the measured timeline, verification, and CLI behavior.
 
@@ -59,7 +59,7 @@ Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instea
 1. (Optional) If you haven't logged in to Brev, click `Sign In`, you will be prompted to log in or register. After logging in, you will be redirected back to the launchable page.
 1. (Optional) If you have multiple Brev organizations, make sure to select the correct one from the dropdown menu in the top right corner of the page.
 1. Click `Deploy Launchable`, and wait for provisioning to complete. (If it failed, delete and re-deploy the launchable.)
-1. Click `Go to instance page` to open the Brev workspace in a new browser tab, and wait for the `script` part to switch from `Executing` to `Completed`. (You will get 404 errors if not waiting until script completes)
+1. Click `Go to instance page` to open the Brev workspace in a new browser tab. After setup and any automatic reboot, wait for `ready` (`cat /var/lib/isaac-lab-ex-ros2-setup.state`) before opening the application links.
 1. Finally, use the `novnc`, `jupyter`, or `code-server` links.
 
 To build your own launchable, or to deploy another version:
@@ -67,7 +67,7 @@ To build your own launchable, or to deploy another version:
 1. Create a Brev Launchable using **VM Mode**. Keep the default Brev software environment so Docker, Docker Compose, and NVIDIA Container Toolkit are available.
 1. Add the contents of the setup script for the version you want as the VM setup script: [`brev_setup_2_3_2_ros2_jazzy.sh`](./brev_setup_2_3_2_ros2_jazzy.sh) or [`brev_setup_3_0_0_beta2_patch1_ros2_jazzy.sh`](./brev_setup_3_0_0_beta2_patch1_ros2_jazzy.sh).
 1. Configure the ports or Secure Links you need from the Compose file: SSH `2222`, VNC `5900`, noVNC `6080`, VS Code `8080`, and JupyterLab `8888`.
-1. Deploy the Launchable. Track progress with `cat /var/lib/isaac-lab-ex-ros2-setup.state` and wait for `ready`. The 2.3.2 script installs a different driver branch than the base image provides, so it schedules a reboot once the image is pulled and `nvidia-smi` fails until then; the 3.0.0-beta2.patch1 script keeps the base image's driver and starts the application without rebooting.
+1. Deploy the Launchable. Track progress with `cat /var/lib/isaac-lab-ex-ros2-setup.state` and wait for `ready`. The scripts install the required driver branch and reboot only when needed; `nvidia-smi` can fail temporarily before that reboot.
 1. Verify the driver and application, reconnecting first if the VM rebooted:
 
    ```sh
@@ -82,9 +82,9 @@ The systemd unit retries until the GPU driver is ready, while Compose's `restart
 
 ### Verified Instance Types (2.3.2)
 
-The 2.3.2 setup script needs no per-GPU changes: driver branch 580 covers Ada and Turing alike, and the same script resolved `580.178.04` on every instance below. Each row passed all five service probes plus Isaac Sim init and a 3-iteration cartpole training, on a 256GiB disk:
+The 2.3.2 setup script needs no per-GPU changes: driver branch 580 covers Ada and Turing alike. In August 2026, each row below passed all five service probes plus Isaac Sim init and a 3-iteration cartpole training, on a 256GiB disk:
 
-**Prefer AWS.** It is the most exercised path here, and the recommended instance per GPU is the cheapest AWS row below: `g4dn.xlarge` for T4, `g6.xlarge` for L4, `g6e.xlarge` for L40S. Other clouds are recorded for reference, not as recommendations.
+**Prefer AWS.** It is the most exercised path here, and the recommended instance per GPU is the cheapest AWS row below: `g4dn.xlarge` for T4, `g6.xlarge` for L4, `g6e.xlarge` for L40S. GCP and shadeform are recorded for reference, not as recommendations.
 
 Sorted by price:
 
@@ -102,7 +102,7 @@ Sorted by price:
 >
 > Adding cameras fails outright. `Isaac-Cartpole-RGB-Camera-Direct-v0 --headless --enable_cameras --num_envs 16` never finished environment setup and was killed at a 450s timeout, with PhysX additionally falling back to software (`GPU solver pipeline failed, switching to software`).
 >
-> The cause is host-side and affects any image: Brev's GCP instances install a compute-only NVIDIA driver, so `/usr/lib/x86_64-linux-gnu` contains no `libGLX_nvidia`, `libEGL_nvidia`, or `libnvidia-glcore` for the container toolkit to inject. GCP does offer graphics-capable [RTX Virtual Workstation types](https://docs.cloud.google.com/compute/docs/gpus) (`nvidia-l4-vws`, `nvidia-tesla-t4-vws`, ...), which Google describes as intended for "NVIDIA Omniverse simulation workloads", but `brev search gpu` exposes none of them. Treat GCP as compute-only for Isaac workloads on Brev, and see [the Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md) for the full measurement.
+> Those August 2026 GCP hosts lacked NVIDIA graphics libraries. A fresh GCP L4 later passed camera-enabled AICapstone datagen with the full 580 driver stack; that result does not revalidate this ROS 2 camera task. See the [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md#provider-choice-for-rendering-workloads) for details.
 
 VRAM is the size Brev's instance search reports; `nvidia-smi` shows slightly less usable memory (for example 15360 MiB on the T4, 46068 MiB on the `g6e` L40S).
 
@@ -116,7 +116,7 @@ VRAM is the size Brev's instance search reports; `nvidia-smi` shows slightly les
 
 Brev provisions each cloud through its own `cloudCredId`: `devplane-brev-1-credential` (AWS), `brev-gcp-test` (GCP), `shadeform`, `crusoe-prod`, `brev-nebius-prod`. The create path is otherwise identical, and the setup script needs no changes for any of them.
 
-Two differences matter if you ever move off AWS. Non-AWS base images already ship a 580 driver, so the script installs nothing and skips its reboot — that is why the shadeform L40S reached `ready` in ~4 minutes against 14-23 on AWS, whose base ships 595 and forces the downgrade. And disk size is not always yours to choose: `massedcompute_L40S` provisions its fixed 625GB regardless of the requested `diskStorage`. GCP lists no L40S at all.
+Base drivers differ: the October 2026 sweep found 565 on Crusoe, 570 on Lambda, 580 on shadeform/Nebius, and 595 on AWS/GCP. The setup script detects the loaded branch and reboots only when needed. Disk size is not always configurable: `massedcompute_L40S` provisions its fixed 625GB regardless of the requested `diskStorage`. GCP lists no L40S at all.
 
 #### Disk Sizing
 

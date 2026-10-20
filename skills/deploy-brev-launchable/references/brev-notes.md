@@ -17,7 +17,7 @@ and all of it is normal:
   `ExecStartPre=/usr/bin/nvidia-smi` cannot pass yet.
 - There is no container and `docker images` is empty.
 
-Waiting is the correct action. The setup script's own `shutdown -r +1` fires once the
+Waiting is the correct action. The setup script's scheduled reboot fires once the
 pull finishes, the reboot loads the 580 module, and the unit starts Compose within
 seconds. Intervening destroys the evidence and can pre-empt a step the script was about
 to take: a manual reboot issued ~14 minutes in looked like it "fixed" a hung deploy when
@@ -39,6 +39,126 @@ Two traps that make inference unreliable:
 - **`build_status=COMPLETED` is not a readiness signal.** Brev reports it roughly 14
   minutes before the setup script actually finishes. Wait for the `ready` phase, which
   the systemd unit writes after Compose is up.
+
+## AWS DLAMI Can Block Driver Installation
+
+A 2026-10-19 report, reproduced with the original AICapstone setup script on a fresh AWS
+`g6e.xlarge` on 2026-10-20, found that a newer Brev AWS DLAMI base carries
+`/etc/apt/preferences.d/00-dlami-block-nvidia-driver`. It gives `nvidia-driver*`,
+`kmod-nvidia*`, and `nvidia-kmod*` apt priority `-1`, so the 580 install fails with:
+
+```
+Package 'nvidia-driver-580' has no installation candidate
+```
+
+This differs from the temporary driver/library mismatch during a healthy setup. The script
+has exited at `installing-driver`, the original 595 driver remains loaded, and no image pull
+or reboot follows. Capture the setup log, running apt/dpkg processes, the preference file,
+and `apt-cache policy nvidia-driver-580` before intervening. A `Candidate: (none)` with
+available versions at priority `-1` identifies the package-policy block. Retrying apt or
+renaming the package to `nvidia-open-580` cannot bypass its blocked driver dependencies.
+
+The AICapstone and Isaac Lab 2.3.2 setup scripts remove only this AWS DLAMI preference in the
+driver-change branch, refresh apt metadata, then install the existing 580 package. Removal
+with `rm -f` also tolerates an absent AWS preference file. A host already running 580 skips
+this branch and retains its NVIDIA packages and preferences.
+
+The report verified a manual install and a fresh AICapstone deployment reaching `ready` on
+580.178.04. That is setup evidence, not a rendering or dataset check. A provider sweep must
+also verify NVIDIA Vulkan (`vendorID = 0x10de`), run camera-enabled datagen, and inspect the
+exported dataset and videos. Do not count `nvidia-smi` or `ready` alone as application success.
+
+The 2026-10-20 sweep subsequently passed those workload checks across six providers,
+including AWS after the additional CDI repair below. See the dated
+[AICapstone results](#aicapstone-driver-regression-validation-2026-10-20)
+for driver versions, instance types, exported frame counts, and validation scope.
+
+Update the Launchable's saved script before a fresh test; it does not follow repository edits.
+Preserve existing instances, and delete the test VMs once their evidence has been collected.
+
+## Older Packaged Drivers Can Block a Branch Change
+
+The 2026-10-20 provider sweep found two additional obstacles on Crusoe's Ubuntu 22.04 base,
+which starts on driver 565.57.01. Removing the AWS preference alone cannot address them:
+
+- **Installed driver packages are held.** Apt finds a 580 candidate but cannot replace
+  `nvidia-driver-565`, its DKMS/kernel packages, and related utilities. Release holds only on
+  installed driver components before changing branches. Do not unhold every `nvidia-*` package:
+  this base also holds the container toolkit, and hundreds of uninstalled package names.
+- **An obsolete graphics package owns a file that moved.** Even after releasing the holds,
+  installing CUDA-repository `libnvidia-gl-580` fails because
+  `/usr/lib/x86_64-linux-gnu/gbm/nvidia-drm_gbm.so` still belongs to `libnvidia-extra-565`.
+  Remove installed `libnvidia-extra-*` packages from older branches before the 580 install.
+  Apt had left this package installed as an unused dependency; resolving dependencies alone
+  did not predict the subsequent dpkg file collision.
+
+Capture the failed setup log, `apt-mark showhold`, installed package status, and apt policy
+before changing anything. These are separate failures from `Candidate: (none)`, and an apt
+retry cannot fix either. Preserve the container-toolkit holds. Hosts already running 580
+skip all of these changes.
+
+## `shutdown` Can Return Success Without Scheduling a Reboot
+
+On Lambda's Ubuntu 22.04 base (2026-10-20), `/usr/sbin/shutdown` resolves through an
+alternative to `shutdown.lambda`. That wrapper only broadcasts a notice about terminating
+instances in the provider console. It ignores `-r +1` and returns success, so setup reports
+completion but stays at `rebooting`: the old 570.148.08 kernel module remains loaded against
+new 580 userspace, and `nvidia-smi` reports an NVML version mismatch.
+
+Check `readlink -f /usr/sbin/shutdown`, the setup log, boot ID, the pending shutdown schedule,
+and the shutdown journal before intervening. An empty schedule alone does not prove failure;
+pair it with the unchanged boot and loaded module after the scheduled time has passed.
+
+The AICapstone and Isaac Lab 2.3.2 scripts instead schedule a systemd timer that invokes
+`/usr/bin/systemctl reboot` after one minute. This preserves Brev's window to record setup
+completion and uses the normal reboot path rather than Lambda's `shutdown.lambda` wrapper.
+Verified on that Lambda VM: the boot changed, driver 580.119.02 loaded, and the ready unit
+succeeded without a manual reboot.
+
+For the updated scripts, inspect `systemctl list-timers aicapstone-reboot.timer --all`
+(or `isaac-lab-ex-ros2-reboot.timer`), not just `/run/systemd/shutdown/scheduled`. The timer
+is transient and disappears on reboot; confirm the new boot ID and loaded module afterward.
+
+## CDI Specifications Can Retain Removed Driver Paths
+
+Later AWS and GCP deployments in the 2026-10-20 sweep exposed a second post-reboot failure:
+host `nvidia-smi` reported 580.178.04 and setup reached `ready`, but GPU containers failed
+before their entrypoint with `open /usr/lib/x86_64-linux-gnu/libcuda.so.595.91.07: no such
+file or directory`. The runtime was in CDI mode and `/etc/cdi/nvidia.yaml` still referenced
+the removed 595 libraries. This is different from a loaded-module/userspace mismatch.
+
+Capture `systemctl cat nvidia-cdi-refresh.service`, its boot journal, the runtime's
+`config.toml`, and CDI files in `/etc/cdi` and `/var/run/cdi` before changing them. On these
+hosts, Brev's local refresh unit declared `After=docker.service` and restarted Docker in
+`ExecStartPost`. NVIDIA Container Toolkit 1.20.1 added its `10-container-engines.conf` drop-in declaring
+`Before=docker.service`. Systemd reported an ordering cycle and skipped refresh, leaving
+the old specification intact. An earlier GCP VM in the same sweep had passed; provider
+identity and a healthy host driver do not establish container readiness.
+
+The two 580 setup scripts detect this combination of Brev's local unit and NVIDIA's drop-in, then mask only
+the conflicting drop-in with an empty file of the same name under `/etc/systemd/system/`.
+This is the override mechanism described in NVIDIA's packaged drop-in itself. Their application
+units wait for any queued CDI refresh and regenerate an existing `/etc/cdi/nvidia.yaml`
+after `nvidia-smi` passes, before publishing readiness or starting Compose. Hosts without
+that Brev CDI file skip regeneration. Do not generate against a half-installed driver:
+wait for the new module to load after reboot.
+
+Recovery on both affected VMs restored container `nvidia-smi` and NVIDIA Vulkan. A subsequent
+controlled AWS reboot with the final units completed refresh and readiness automatically,
+with no ordering cycle in the new boot journal. The generated units also passed
+`systemd-analyze verify` before that reboot.
+A fresh GCP 8-vCPU L4 deployment with the CDI repair also installed 580, rebooted, refreshed
+the specification, and passed container GPU/Vulkan checks without manual recovery. Its new
+boot journal had no ordering cycle and the specification referenced the loaded 580 libraries.
+Its camera-enabled datagen then passed in 492s, with two exported episodes, 1010 parquet
+rows, and 1010 decoded frames in each camera stream. A final setup-script rerun preserved
+the boot, package holds, and image identity and rechecked NVIDIA Vulkan successfully.
+
+[NVIDIA's CDI documentation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html)
+describes service-triggered and direct `nvidia-ctk cdi generate` regeneration, and notes
+that driver removal is not automatically handled. Refresh the specification matching the
+runtime configuration; do not leave conflicting copies in both CDI directories. Require
+container `nvidia-smi`, NVIDIA Vulkan, and the actual camera workload after recovery.
 
 ## Prefer the Base Image's Driver Branch When the Application Allows It
 
@@ -164,53 +284,38 @@ A rendering failure of this kind also **hangs rather than exits**: the Kit proce
 
 ## Provider Choice for Rendering Workloads
 
-**GCP cannot run a rendering workload at all.** Its instances install a *compute-only* NVIDIA
-driver: no `libGLX_nvidia`, no `libEGL_nvidia`, no `libnvidia-glcore` anywhere on the host. The
-container toolkit can only inject libraries the host actually has, so no image can render there.
-Verified on both a T4 and an L4 instance, and confirmed image-independent — `isaac-lab-ex-ros2` on
-the same GCP host also falls back to `llvmpipe` software rendering rather than using the GPU.
+**Recheck the base image rather than treating a provider as permanently compute-only.** On
+2026-10-20, a fresh GCP `g2-standard-4:nvidia-l4:1` started on 595.91.07. The AICapstone
+setup installed the full 580.178.04 driver stack and rebooted; container `vulkaninfo` then
+reported NVIDIA L4 with `vendorID = 0x10de`. The older claim that GCP-via-Brev cannot render
+was too broad. Brev still listed no `-vws` types in that sweep, so their absence alone is
+not evidence that NVIDIA Vulkan is unavailable.
 
-**GCP does have graphics-capable SKUs, but Brev does not offer them.** Google's
-[GPU documentation](https://docs.cloud.google.com/compute/docs/gpus) lists NVIDIA RTX Virtual
-Workstation types — `nvidia-rtx-pro-6000-vws` (G4), `nvidia-l4-vws` (G2), and
-`nvidia-tesla-t4-vws` / `-p4-vws` / `-p100-vws` (N1) — and describes them as "designed for
-workloads such as **NVIDIA Omniverse simulation workloads**, graphics-intensive applications,
-video transcoding, and virtual desktops". Creating a vWS instance automatically attaches a vWS
-license, and that is the SKU family intended for Isaac Sim on GCP.
+The camera-enabled AICapstone cup-stacking run then completed in **781s**, exporting two
+episodes / 1010 parquet rows and 1010 decoded frames in each camera MP4. This is rendering
+and dataset evidence for that setup, beyond the Vulkan probe.
 
-`brev search gpu` offers none of them. Checked 2026-08-19: every GCP accelerator Brev exposes is a
-plain compute type (`nvidia-tesla-t4`, `-p4`, `-v100`, `-a100`, `nvidia-a100-80gb`,
-`nvidia-h100-mega-80gb`, `nvidia-l4`), with zero `-vws` entries. So **GCP-via-Brev cannot render**,
-and that is a catalogue limitation rather than a property of GCP itself. If GCP is required for a
-rendering workload, provision a vWS instance outside Brev.
+The **2026-08-19** GCP failures remain valid historical measurements. Those T4/L4 hosts
+already ran 580, so setup skipped installation. They had no `libGLX_nvidia`, `libEGL_nvidia`,
+or `libnvidia-glcore` for the container toolkit to inject. Both AICapstone and the
+`isaac-lab-ex-ros2` image fell back to software rendering or failed graphics initialization.
+On the L4 with the ROS 2 image:
 
-> Google's page does not spell out the driver-level difference, so treat the causal chain as
-> inferred: what was *measured* here is that Brev's non-vWS GCP instances ship no graphics
-> libraries at all.
-
-**Confirmed by direct test, not inference.** On `g2-standard-4:nvidia-l4:1` running the
-`isaac-lab-ex-ros2` 2.3.2 image:
-
-| test | result |
+| test | August 2026 result |
 | --- | --- |
 | `vulkaninfo` in container | `llvmpipe` only, no NVIDIA device |
-| `Isaac-Cartpole-v0`, no cameras | **passes**, 95627 fps total — but Kit logs `Driver Version: 0` |
-| `Isaac-Cartpole-RGB-Camera-Direct-v0 --enable_cameras` | **fails**, killed at 450s having never completed environment setup |
+| `Isaac-Cartpole-v0`, no cameras | **passes**, 95627 fps total, but Kit logs `Driver Version: 0` |
+| `Isaac-Cartpole-RGB-Camera-Direct-v0 --enable_cameras` | **fails**, killed at 450s before environment setup completed |
 
-`Driver Version: 0` is the tell: Kit is on software Vulkan, not the host's 580.173.02. Cartpole
-still posts high fps because PhysX runs on the GPU through CUDA and the workload renders nothing.
-Add cameras and PhysX drops to software too (`GPU solver pipeline failed, switching to software`).
+`Driver Version: 0` identifies software Vulkan. PhysX can still use CUDA for a task without
+cameras, so a passing non-rendering benchmark cannot validate graphics. Check NVIDIA Vulkan,
+then run a camera workload and inspect its recorded output.
 
-So the GCP rows in the `isaac-lab-ex-ros2` verified-instance table are genuine cartpole numbers but
-are **not** evidence of GPU rendering, and that table now carries a note saying so. A passing
-non-rendering benchmark cannot validate a rendering deployment — check `Driver Version` in the Kit
-log, or `vulkaninfo`, before believing a GPU is being used for graphics.
-
-**Do not try to fix a host.** Installing `libnvidia-gl-<branch>` on a GCP instance added the
-libraries and then broke the NVIDIA container toolkit outright — GPU containers stopped starting
-with `/run/nvidia-persistenced/socket: no such file or directory`, which is strictly worse than the
-original failure. A Brev VM should need only the driver, Docker, and a working container toolkit;
-everything else belongs in the image. When a rendering workload fails, fix the container.
+A partial graphics-package repair on an August GCP host also broke GPU container startup
+with `/run/nvidia-persistenced/socket: no such file or directory`. That does not establish
+that a complete driver install and reboot cannot work. Prefer the setup script's complete
+driver path and validate the container toolkit after reboot; keep application fixes in the
+image. Do not generalize an old base-image failure into a permanent provider restriction.
 
 Measured throughput for one Isaac Sim camera-recording workload (`--num_envs 1`, two 640x480
 cameras), which generalises better than a GPU ranking:
@@ -231,7 +336,7 @@ and an immediate identical retry succeeded each time.
 
 Both cost time here, and both are cheap to avoid:
 
-- **`grep`-ing for the vendor name misses Tesla cards.** A Vulkan probe matching
+- **Matching only `NVIDIA` in the GPU name misses Tesla cards.** A Vulkan probe matching
   `deviceName.*NVIDIA` reports a false failure on a T4, which identifies itself as `Tesla T4`.
   Three rows read as broken while their datagen had actually succeeded. Assert on the *workload's*
   output, not on a device-name string.
@@ -349,6 +454,10 @@ calls can. `POST /api/organizations/<ORG>/workspaces` on
   Launchable's own create payload, which is the authoritative template to copy.
 - A deleted instance holds its name until deletion finishes; reusing it immediately fails
   with `400 duplicate workspace with name <NAME>`.
+- A successful create response puts the workspace ID in top-level `id`, not
+  `environment.id`. Record the intended name before the POST and save the response. If an
+  ID parser fails after HTTP 201, reconcile that name with `brev ls --all --json` instead
+  of creating another billed VM.
 
 The setup script attaches at create time too — put it in
 `vmBuild.lifeCycleScriptAttr.script` as inline text:
@@ -407,6 +516,11 @@ and all were the watcher's fault rather than Brev's:
   yet". Poll `brev ls --json` instead: the CLI refreshes its own token. If a script must
   use the REST API, run any `brev` command first and re-read `~/.brev/credentials.json`,
   because the CLI rewrites the token there.
+- **A REST create can still receive 401 after a successful CLI read.** Observed twice in
+  the October sweep. Run `brev ls --all --json` again, re-read the stored token, and retry
+  the rejected request. Both retries succeeded. Keep this separate from an ambiguous
+  timeout: reconcile the intended instance name before retrying a create whose outcome
+  is unknown, to avoid duplicate billed VMs.
 - **`grep -c READY` also matches `NOT READY`.** That declared success in 30 seconds, so
   `brev refresh` ran before any relay existed and wrote no host entries at all. Match the
   delimited field (`grep -c '|READY$'`).
@@ -462,6 +576,11 @@ Accepted`) were retried and the task failed again each time, leaving the rows in
 - Retrying beyond twice is not useful once the task is failing repeatedly. Fall back to the
   console at <https://brev.nvidia.com>, or contact Brev, rather than looping.
 
+After successful removal, `GET /api/workspaces/<id>` can return HTTP 500 with an embedded
+`rpc error: code = NotFound` / `environment not found`, rather than HTTP 404 (measured
+2026-10-20). A watcher that recognizes only 404 will keep counting a deleted VM as active.
+Confirm absence from a successful `brev ls --all --json` response instead.
+
 What this does *not* establish is an ongoing charge. Once `terminate-environment-instance`
 succeeds the instance is terminated, and an EC2 root volume is normally deleted with its
 instance, so a stale row is most likely bookkeeping rather than billing. Verify in the console
@@ -488,6 +607,36 @@ before assuming either way; do not report a cost you have not confirmed.
   login. Re-check authentication before starting anything long.
 
 ## Verify a GPU Workload, Not Just the Ports
+
+### Read Kit's detailed log during camera startup
+
+The AICapstone stdout log is largely warning-level output. It can stop printing while
+Isaac Sim's tasking threads are busy compiling ray-tracing pipelines. Read the path in
+`[carb] Logging to file:` and inspect that file inside the running container. In the
+2026-10-20 GCP L4 run, the detailed log reported
+`Waiting for RtPso async group async compilation` every five seconds while stdout was quiet.
+This identifies the current phase; it does not prove compilation will finish. Keep a bounded
+workload timeout and require a nonempty dataset with decoded camera frames before calling
+the provider supported. A working NVIDIA `vulkaninfo` probe alone does not validate cameras.
+
+That 4-vCPU L4 run eventually passed in 781s. Its detailed log had already spent more than
+six minutes waiting for shader compilation before the camera environment came up. CPU
+activity and the full Kit log distinguish this cold startup from an early graphics error;
+do not equate a quiet warning-level stdout log with a dead simulator.
+
+A later 8-vCPU L4 run passed in 485s with the same two episodes / 1010 frames per camera.
+These are individual cold-start smoke runs; toolkit configuration and startup caches also
+varied, so the timings do not isolate a CPU scaling ratio.
+
+### Keep machine-readable probes separate from container banners
+
+CUDA images can print their entrypoint banner before a Python JSON result. That made a
+collector's `json.loads(stdout)` fail even after its dataset checks had passed during the
+2026-10-20 sweep. For metadata-only probes, use `docker run --rm --entrypoint python
+<image> ...` so stdout contains the requested payload. Preserve raw output and the probe's
+exit code when diagnosing parsing failures; a collector error is not a workload result.
+
+### Check services, then exercise the GPU
 
 All five services can answer while Isaac Sim cannot initialize, since Kit additionally
 needs GPU passthrough and Vulkan inside the container. Check the driver, the service, and
@@ -598,3 +747,27 @@ done < targets.tsv
 
 The same applies to `brev stop`/`brev start`. Prefer passing several names in one call
 (`brev delete a b c`) or a `for` loop over an array when the list is already in memory.
+
+## AICapstone Driver Regression Validation (2026-10-20)
+
+Seven single-GPU configurations across six providers passed `HCIS-CupStacking-SingleArm-v0` with `--num_envs 1 --num_demos 3 --headless --enable_cameras --record --use_lerobot_recorder`. Each result required a healthy host/container driver, NVIDIA Vulkan, an active NVIDIA device in Kit's log, nonempty parquet data, and fully decoded front/wrist camera videos at 640x480. The frame counts below match both parquet rows and each camera stream.
+
+All used image digest `sha256:813e073bb507bdf3af8567951865a9c3ed5f0a1d50ba3604561a50a2362519dc` and AICapstone commit `9dd61f693f2db770338ce84fdd232dd7040c9555`. These are individual cold-start smoke timings, including shader compilation and export, rather than steady-state throughput benchmarks.
+
+AWS, GCP, and Nebius used 256GiB disks. Fixed provider disks stayed at their catalog sizes: 128GB on Crusoe, 625GB on shadeform, and 1400GB on Lambda.
+
+| Cloud | Instance | vCPU | Loaded driver | Episodes / frames | Datagen |
+| --- | --- | ---: | --- | ---: | ---: |
+| GCP | `g2-standard-4:nvidia-l4:1` | 4 | 580.178.04 | 2 / 1010 | 781s |
+| GCP | `g2-standard-8:nvidia-l4:1` | 8 | 580.178.04 | 2 / 1010 | 485s |
+| shadeform | `massedcompute_L40S` | 12 | 580.126.09 | 2 / 1010 | 198s |
+| Lambda | `gpu_1x_a10` | 30 | 580.119.02 | 2 / 1010 | 210s |
+| Crusoe | `l40s-48gb.1x` | 8 | 580.178.04 | 2 / 1010 | 272s |
+| Nebius | `gpu-l40s-a.1gpu-8vcpu-32gb` | 8 | 580.173.02 | 1 / 505 | 332s |
+| AWS | `g6e.xlarge` | 4 | 580.178.04 | 2 / 1010 | 504s |
+
+The sweep reproduced the AWS apt block, Crusoe holds/file collision, Lambda reboot wrapper, and later AWS/GCP stale CDI specification described above. The final AWS units also passed a subsequent reboot without the CDI ordering cycle. Setup revisions and raw results are recorded under `artifacts/hcis-lab-aicapstone/raw/evidence/brev-driver-580/20261020t060802z/`; earlier provider runs preceded the later CDI fix. Diagnosis and repair steps are recorded in the troubleshooting sections above.
+
+An additional fresh 8-vCPU GCP deployment with the CDI repair reached `ready` and passed the same camera workload without manual recovery: two episodes / 1010 frames in 492s. Final-script reruns on AWS and both 8-vCPU GCP VMs preserved their boot IDs, package holds, and image IDs while NVIDIA Vulkan remained healthy.
+
+This covers one suitable instance per single-GPU provider, with an extra GCP CPU configuration. Launchpad and SFCompute exposed only multi-GPU choices in the filtered catalog and were outside this budgeted sweep; shadeform coverage is the Massed Compute backend. Episode counts vary with domain randomization and the [final-episode export bug](../../../docker/hcis-lab-aicapstone/README.md#--num_demos-n-exports-only-n-1-episodes).

@@ -32,7 +32,10 @@ This repository is a documentation-and-assets workspace for running NVIDIA Isaac
 Use `README.md` and `install.md` for end-to-end setup and cluster-specific steps.
 
 ## Coding Style & Naming Conventions
+- Prefer minimal, task-focused diffs. Preserve existing documentation, sections, and tables; avoid unrelated rewrites or moving material solely to shorten a guide.
 - Shell scripts use Bash (`#!/bin/bash`) with 2-space to 4-space indentation; keep style consistent with the touched file.
+- Keep operational scripts self-contained. Comments should explain the code's purpose, affected providers/versions, failure symptoms, and workaround rationale. Keep investigation provenance (sweep dates, which application discovered a shared issue), validation histories, and pointers to agent skills or evidence directories out of script comments; put those in adjacent application guides or skill references. Direct upstream technical references and paths needed to explain runtime behavior are appropriate.
+- Name the cloud, service, or software maintainer responsible for a behavior when known (for example AWS, Crusoe, Brev, or NVIDIA Container Toolkit). Avoid vague attribution such as "some providers", "vendors", or "other bases"; describe the exact detection condition when no cloud-specific claim is supported.
 - Prefer descriptive, lowercase file names with underscores for scripts (for example `create_user.sh`).
 - Dockerfiles are organized by product/version (`Dockerfile_5_0_0`, `Dockerfile_2_2_0`); follow the existing version suffix format.
 - Use explicit version tags for Dockerfile base images without `@sha256` digests, matching the existing repository convention. Record resolved image digests in validation notes or benchmark evidence when needed instead of embedding them in `FROM`.

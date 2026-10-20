@@ -31,7 +31,7 @@ docker run --rm j3soon/runai-hcis-lab-aicapstone:latest \
 
 It uses upstream's own stack rather than this repository's usual `nvcr.io/nvidia/isaac-lab:X` images: Isaac Sim 5.1.0 installed from pip (`isaacsim[all,extscache]==5.1.0`), Isaac Lab built from the pinned submodule, and PyTorch 2.7.0 on CUDA 12.8.
 
-The base matches upstream (`nvidia/cuda:12.8.1-devel-ubuntu22.04`). The only addition is a GLVND EGL vendor registration, which the NVIDIA container toolkit does not inject and which `--enable_cameras` needs on some hosts — see [The EGL vendor file is required](#the-egl-vendor-file-is-required). A 24.04 base was trialled while diagnosing that failure and made no difference; it is not needed.
+The base matches upstream (`nvidia/cuda:12.8.1-devel-ubuntu22.04`). The only addition is NVIDIA's GLVND EGL vendor registration, which the NVIDIA container toolkit does not inject and which was required for `--enable_cameras` on AWS — see [The EGL vendor file is required](#the-egl-vendor-file-is-required). A 24.04 base was trialled while diagnosing that failure and made no difference; it is not needed.
 
 The USD scenes, object meshes, and textures under `packages/simulator/assets/` are committed as plain git blobs, so unlike [Sim-to-Real SO-101 Workshop](../sim-to-real-so101-workshop/README.md) there is no Git LFS step and no pointer-file trap.
 
@@ -156,7 +156,7 @@ Evidence, including full logs, is under `artifacts/hcis-lab-aicapstone/raw/evide
 
 > Skip this section if you're not using Brev.
 
-> **Status: works.** Validated end to end on both AWS `g6e.xlarge` and shadeform `massedcompute_L40S`.
+> **Status: works.** Camera-enabled datagen validated on AWS, GCP, shadeform, Lambda, Crusoe, and Nebius. See the [October 2026 validation results](../../skills/deploy-brev-launchable/references/brev-notes.md#aicapstone-driver-regression-validation-2026-10-20).
 >
 > An earlier version of this image failed on AWS with `Failed to create any GPU devices`. The cause was a **missing GLVND EGL vendor registration**, now shipped in the Dockerfile — see [The EGL vendor file is required](#the-egl-vendor-file-is-required).
 
@@ -164,7 +164,7 @@ Use **VM Mode**, which is the only Brev runtime mode that lets the host NVIDIA d
 
 The 595 incompatibility is a known upstream defect, not just a local observation: [IsaacSim#537](https://github.com/isaac-sim/IsaacSim/issues/537) reports driver 595.79 making Isaac Sim 5.1.0 fail to detect the CUDA device and crash during RTX plugin initialization, with "downgrading the NVIDIA driver to version 580 resolves the issue." This repository measured the same thing independently — see the [Isaac Lab (Extended) with ROS 2 Brev notes](../isaac-lab-ex-ros2/README.md#brev). Note the requirements page states no *maximum* driver version, so the constraint is not discoverable there.
 
-[`brev_setup.sh`](./brev_setup.sh) in this directory does that: it detects the loaded driver branch, installs 580 and reboots only when needed, pulls the image, and publishes a phase file. Paste it into a Launchable's VM setup script, then track progress with `cat /var/lib/aicapstone-setup.state` and wait for `ready`.
+The Launchable uses [`brev_setup.sh`](./brev_setup.sh) to detect the loaded driver branch, install 580 and reboot only when needed, pull the image, and publish a phase file. Track progress with `cat /var/lib/aicapstone-setup.state` and wait for `ready`.
 
 > The script waits for the apt/dpkg lock before its first `apt-get`. Brev's own provisioning runs apt concurrently, and a `set -e` script that skips this dies on `Could not get lock /var/lib/apt/lists/lock`, leaving the phase file at `preparing` — which reads as a stalled instance rather than a failed one.
 
@@ -191,7 +191,7 @@ Isaac Sim  -> Failed to create any GPU devices, including an attempt with compat
 
 With it, on the same host, `vulkaninfo` reports `deviceName = NVIDIA L40S` and datagen runs. The NVIDIA Vulkan ICD reaches the GPU through EGL/GBM when there is no display, and that path needs a registered EGL vendor.
 
-**Why it only appears on some hosts.** Brev's AWS base image ships driver 595, [Isaac Sim 5.1.0 cannot run on 595](https://github.com/isaac-sim/IsaacSim/issues/537), so the setup script installs Ubuntu's `nvidia-driver-580` over it. That downgraded host is missing pieces a normal install provides, which is what exposes the gap. On a provider whose base already ships 580 (shadeform `massedcompute_L40S`) this image worked even before the fix. The error message blames the driver and is therefore doubly misleading: the driver is a contributing condition, but the missing file is in the image.
+**Why AWS exposed the missing registration.** Brev's AWS base image ships driver 595, [Isaac Sim 5.1.0 cannot run on 595](https://github.com/isaac-sim/IsaacSim/issues/537), so the setup script installs Ubuntu's `nvidia-driver-580` over it. That downgraded host is missing pieces a normal install provides, which is what exposes the gap. On shadeform `massedcompute_L40S`, whose base already shipped 580, this image worked even before the fix. The error message blames the driver and is therefore doubly misleading: the driver is a contributing condition, but the missing file is in the image.
 
 This also explains a comparison that was confusing for a long time: this repository's [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md) image rendered on the same AWS host where this one did not, at the same moment. That image writes the same EGL vendor file at build time.
 
@@ -217,11 +217,7 @@ Measured 2026-08-19 with `j3soon/runai-hcis-lab-aicapstone:latest`, one `--num_d
 | `massedcompute_L40S` | shadeform | L40S (46068 MiB) | 12 | 72GiB | $1.06 | passes | 193s | 10437 MiB | 5605 MiB |
 | `g6e.xlarge` | AWS | L40S (46068 MiB) | 4 | 32GiB | $2.23 | passes | 492s | 7377 MiB | 5592 MiB |
 
-**GCP does not work, and no image change can fix it.** Both GCP rows produced an empty dataset. Their hosts install a *compute-only* NVIDIA driver: `/usr/lib/x86_64-linux-gnu` contains no `libGLX_nvidia`, `libEGL_nvidia`, or `libnvidia-glcore` at all, so the container toolkit has nothing to inject and the NVIDIA Vulkan ICD cannot load. This is not specific to this image — the [Isaac Lab (Extended) with ROS 2](../isaac-lab-ex-ros2/README.md) image on the same GCP host also falls back to `llvmpipe` software rendering rather than using the GPU.
-
-GCP itself is not the problem — its catalogue includes NVIDIA RTX Virtual Workstation types (`nvidia-l4-vws`, `nvidia-tesla-t4-vws`, `nvidia-rtx-pro-6000-vws`, ...), which Google describes as intended for "NVIDIA Omniverse simulation workloads". **Brev exposes none of them**: every GCP accelerator in `brev search gpu` is a plain compute type. So this is a Brev catalogue limitation, and running on GCP would mean provisioning a vWS instance outside Brev.
-
-> Do not try to repair this on the host. Installing `libnvidia-gl-<branch>` on a GCP instance added the libraries but broke the NVIDIA container toolkit outright (`/run/nvidia-persistenced/socket: no such file or directory`), leaving the box unable to start GPU containers at all — strictly worse than before.
+**The GCP failures in this table describe the August 2026 base image**, which lacked NVIDIA graphics libraries. With the updated Launchable, a fresh GCP L4 passed camera-enabled datagen on 2026-10-20 after the full 580 driver installation and reboot. See the [Brev deployment notes](../../skills/deploy-brev-launchable/references/brev-notes.md#provider-choice-for-rendering-workloads) for the validation details.
 
 **Everything from a T4 upward works, and 16GiB of RAM is enough.** Peak host RAM stayed between 7.4 and 8.1GiB on every 4-8 vCPU instance; the 12 vCPU shadeform box peaked higher at 10.4GiB, tracking vCPU rather than GPU. Peak VRAM was 4.0GiB on T4, 4.4GiB on L4 and 5.6GiB on L40S, so the 15360 MiB T4 has ample headroom — VRAM is not the constraint for `--num_envs 1`.
 

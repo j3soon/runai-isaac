@@ -64,6 +64,21 @@ apt_get() {
 apt_get update
 command -v curl >/dev/null || \
   apt_get install -y curl
+# AWS/GCP: Brev's local CDI refresh unit runs after Docker and restarts it.
+# NVIDIA Container Toolkit 1.20.1 adds a Before=docker.service drop-in, creating
+# an ordering cycle that prevents refresh and leaves removed 595 library paths
+# in the CDI specification. An empty local override masks NVIDIA's conflicting
+# drop-in only when Brev's After=docker.service unit is present.
+CDI_REFRESH_AFTER=""
+if [ -f /etc/systemd/system/nvidia-cdi-refresh.service ] &&
+   grep -Eq '^After=.*docker\.service' /etc/systemd/system/nvidia-cdi-refresh.service; then
+  CDI_REFRESH_AFTER="nvidia-cdi-refresh.service"
+  if [ -f /usr/lib/systemd/system/nvidia-cdi-refresh.service.d/10-container-engines.conf ]; then
+    sudo install -D -m 0644 /dev/null \
+      /etc/systemd/system/nvidia-cdi-refresh.service.d/10-container-engines.conf
+    sudo systemctl daemon-reload
+  fi
+fi
 sudo systemctl enable --now docker.service
 
 # Brev's AWS base image ships the 595 branch, but this image pins Isaac Sim 5.1.0,
@@ -77,6 +92,30 @@ if [[ "$DRIVER_VERSION" == "$DRIVER_BRANCH".* ]]; then
 else
   set_state "installing-driver"
   echo "[setup] detected NVIDIA driver ${DRIVER_VERSION:-none}; installing branch $DRIVER_BRANCH"
+  # AWS DLAMI bases block nvidia-driver* with apt priority -1. Remove this AWS
+  # preference only when changing drivers; rm -f also handles an absent file.
+  sudo rm -f /etc/apt/preferences.d/00-dlami-block-nvidia-driver
+  apt_get update
+  # Crusoe holds its installed 565 driver packages, preventing replacement with
+  # 580. Release only installed driver holds; retain container-toolkit holds.
+  mapfile -t HELD_DRIVER_PACKAGES < <(
+    dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\n' 'nvidia-*' 2>/dev/null |
+      awk '$1 == "hi" && $2 ~ /^nvidia-((compute-utils|dkms|driver|fabricmanager|firmware|headless|kernel-common|kernel-source|kernel-open|open|utils)-[0-9]|modprobe(:|$)|prime(:|$)|settings(:|$))/ { print $2 }'
+  )
+  if [ "${#HELD_DRIVER_PACKAGES[@]}" -gt 0 ]; then
+    echo "[setup] releasing installed driver holds: ${HELD_DRIVER_PACKAGES[*]}"
+    sudo apt-mark unhold "${HELD_DRIVER_PACKAGES[@]}"
+  fi
+  # Crusoe's libnvidia-extra-565 owns nvidia-drm_gbm.so, which the new
+  # libnvidia-gl-580 also installs. Remove obsolete extras before installing
+  # 580 to avoid this dpkg file collision.
+  mapfile -t OLD_DRIVER_EXTRAS < <(
+    dpkg-query -W -f='${db:Status-Status}\t${binary:Package}\n' 'libnvidia-extra-*' 2>/dev/null |
+      awk -v keep="libnvidia-extra-$DRIVER_BRANCH" '$1 == "installed" && $2 !~ ("^" keep "(:|$)") { print $2 }'
+  )
+  if [ "${#OLD_DRIVER_EXTRAS[@]}" -gt 0 ]; then
+    apt_get remove -y "${OLD_DRIVER_EXTRAS[@]}"
+  fi
   apt_get install -y \
     "linux-headers-$(uname -r)" \
     "nvidia-driver-$DRIVER_BRANCH"
@@ -91,17 +130,19 @@ sudo docker pull "$IMAGE" || echo "[setup] image pull failed; pull it by hand be
 
 # Publishes `ready` once nvidia-smi passes, which after a driver-change reboot is
 # the first moment the GPU is actually usable. Nothing to start: the image runs
-# batch commands, so the operator launches the workload over SSH.
+# batch commands, so the operator launches the workload over SSH. Refresh an
+# existing Brev CDI spec after nvidia-smi passes, before publishing ready.
 sudo tee "/etc/systemd/system/$SERVICE_NAME" >/dev/null <<EOF
 [Unit]
 Description=Mark HCIS-Lab AICapstone VM ready
 Wants=docker.service network-online.target
-After=docker.service network-online.target
+After=docker.service network-online.target $CDI_REFRESH_AFTER
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/nvidia-smi
+ExecStartPre=/bin/sh -c 'if [ -f /etc/cdi/nvidia.yaml ]; then /usr/bin/nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml; fi'
 ExecStart=/bin/sh -c 'echo ready > $STATE_FILE'
 Restart=on-failure
 RestartSec=15s
@@ -116,11 +157,13 @@ sudo systemctl enable "$SERVICE_NAME"
 
 if [ "$NEEDS_REBOOT" = "1" ]; then
   # Schedule rather than reboot immediately, so Brev can finish recording setup.
+  # Lambda replaces shutdown with a no-op; its systemctl reboot still works.
   set_state "rebooting"
-  sudo shutdown -r +1 "Rebooting to load the NVIDIA $DRIVER_BRANCH driver"
+  sudo systemd-run --unit=aicapstone-reboot --on-active=1m \
+    --timer-property=AccuracySec=1s /usr/bin/systemctl reboot
   echo "Setup complete. The VM will reboot in approximately one minute."
 else
-  sudo systemctl start "$SERVICE_NAME"
+  sudo systemctl restart "$SERVICE_NAME"
   set_state "ready"
   echo "Setup complete. No reboot required."
 fi
