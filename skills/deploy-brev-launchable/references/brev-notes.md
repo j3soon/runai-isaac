@@ -636,6 +636,11 @@ collector's `json.loads(stdout)` fail even after its dataset checks had passed d
 <image> ...` so stdout contains the requested payload. Preserve raw output and the probe's
 exit code when diagnosing parsing failures; a collector error is not a workload result.
 
+Match success markers as complete lines and require a zero process exit code.
+Kit crash reports can echo a Python `-c` command containing the marker literal
+even when the constructor crashed before printing it. A substring search in the
+November driver reproduction would have incorrectly marked that crash as a pass.
+
 ### Frame the recorded scene before asserting on image variance
 
 Isaac Lab 2.3.2's RGB Cartpole task defaults to a viewer at `(20, 20, 20)`.
@@ -856,3 +861,108 @@ Raw evidence is under
 `artifacts/brev-saved-launchable/raw/evidence/defaults/20261020t131000z/`.
 All six test VMs, including the first shadeform attempt, were confirmed absent
 from the final inventory. Estimated compute/storage cost was $2.82.
+
+## AWS DLAMI Boot Selector Can Undo a Packaged Driver Install
+
+A fresh AWS `g6e.xlarge` on 2026-11-16 reproduced another downgrade failure with
+the unchanged saved 2.3.2 script. The base loaded 595.112.07 on kernel
+6.8.0-1069-aws and registered `nvidia-open/595.112.07` in DKMS, without an owning
+Debian package. Apt selected 580.196.07 and continued successfully despite:
+
+```text
+Error! Module version 580.196.07 for nvidia.ko
+is not newer than what is already found in kernel 6.8.0-1069-aws (595.112.07).
+You may override by specifying --force.
+```
+
+Only `nvidia-drm.ko` was replaced; `modinfo -F version nvidia` still reported 595.
+DKMS misleadingly listed 580 as installed, with `Differences between built and
+installed modules`. Apt package status and its exit code did not prove the
+requested kernel module had been installed.
+
+The same base left unowned 595 libraries alongside package-owned 580 files.
+`ldconfig` selected the higher 595 NVML, CUDA, and GLX libraries. The runfile
+uninstaller invoked by the package referred to an older 580.159.03 installation
+and did not clean those 595 files. Forcing only the kernel-module downgrade
+would leave mismatched userspace libraries.
+
+A cleanup-only fresh test then revealed the boot-time source of those files.
+AWS's `nvidia-kmod-load.service` invokes
+`/opt/aws/dlami/bin/nvidia-kmod-load.sh`. It restores libraries and binaries from
+`/opt/nvidia/userspace/open` and loads archived DKMS modules from
+`/var/lib/dkms-archive/nvidia-open` on every boot. Although 580 modules and
+libraries were correct before reboot, this helper removed the packaged 580
+DKMS registration and restored 595 on disk while the loaded kernel stayed at
+580, producing an NVML mismatch. A pre-reboot check alone cannot validate this.
+
+The complete fix masks only the detected AWS boot-selector unit before taking
+over driver installation, removes unpackaged `nvidia-open` DKMS entries and their
+unowned, version-matched NVIDIA libraries, then installs 580. It retains
+package-owned libraries such as NSCQ, package-owned DKMS sources, and unrelated
+EFA/GDR DKMS registrations. A post-install `modinfo` check rejects a silently
+retained newer module before the image pull or reboot. Hosts already running
+580 keep the existing skip path.
+
+The final fresh AWS deployment passed after its automatic reboot, with
+580.196.07 loaded and on disk, matching NVML/CUDA/GLX, and the AWS selector
+masked/inactive with no execution in the new boot journal. The executed script
+matched the repository source, SHA256
+`6781dc3d4b03c152f61aac33bd96897d0c22e5619c9dea928a84d91f2fa89f4f`.
+All tests used the same ROS 2 image digest recorded in the October validation.
+
+| Fresh test | Result after automatic reboot |
+| --- | --- |
+| Saved script | False `ready` on 595.112.07; bare Sim initialization segfaulted |
+| DKMS/library cleanup alone | 580 loaded, but AWS restored 595 files and caused an NVML mismatch |
+| Complete fix including AWS unit mask | `ready` on 580.196.07; full application checks passed |
+
+The complete fix passed the exact bare `SimulationApp` initialization/close probe
+that failed on 595, all five identified services, host/container NVIDIA checks,
+NVIDIA Vulkan and an active NVIDIA GPU in Kit, ROS 2 Jazzy pub/sub, three Cartpole
+training iterations (512 environments), and three RGB-camera training iterations
+(32 environments). Its 640x480 MP4 decoded all 61 frames, and the sampled image
+was inspected. EFA/GDR DKMS registrations and the package-owned NSCQ library were
+retained; GPUDirect functionality was not tested. Both setup scripts passed
+syntax and fixture checks; the Capstone companion contains the identical host
+cleanup block, but its cup-stacking workload was not rerun here.
+
+These tests did not change the maintained Launchable definition; the saved-script
+retest below covers the maintainer's subsequent update.
+Raw snapshots, failed attempts, the final executed script, camera output, and
+cleanup evidence are under
+`artifacts/brev/raw/evidence/driver-recurrence/20261116t062312z/`.
+
+For testing a patched copy, CLI v0.6.334 silently ignores `--startup-script` when
+`--launchable` is also supplied: a local intercepted request still contained the
+saved script and its lifecycle-script ID. Capture and hash the actual payload
+before spending on a test. A Launchable configuration copied into the documented
+create API can carry the patched script with its old lifecycle ID omitted,
+without editing the maintained Launchable. Label this as a patched-copy test,
+not an unchanged saved-Launchable deployment.
+
+All three November test VMs were confirmed absent from the final inventory.
+Estimated compute/storage cost was $4.91; the original CPU VM was untouched.
+
+### Updated Saved Launchable Retest (2026-11-16)
+
+After the maintainer saved the updated script, a fresh deployment through
+`brev create <test-name> --launchable <id> --detached` passed with the default
+AWS `g6e.xlarge` and 256GiB disk. The saved, executed, and repository scripts all
+matched SHA256 `6781dc3d4b03c152f61aac33bd96897d0c22e5619c9dea928a84d91f2fa89f4f`.
+There were no script, parameter, hardware, disk, or Compose overrides, manual
+setup reruns, driver repairs, service starts, or reboots.
+
+The script reached `ready` after its automatic reboot in about 25 minutes.
+Loaded and on-disk drivers and NVML were 580.196.07; AWS's boot selector remained
+masked/inactive with no execution in the new boot. All five services, NVIDIA
+Vulkan and active Kit GPU, ROS 2 pub/sub, bare Sim initialization/close, and both
+three-iteration training checks passed. The camera MP4 decoded all 61 frames,
+and its sampled 640x480 image was inspected. The image digest matched the earlier
+tests. This validates the updated saved Launchable directly on AWS; it does not
+repeat the October provider sweep or Capstone cup-stacking workload.
+
+Raw evidence is under
+`artifacts/brev/raw/evidence/saved-launchable-retest/20261116t082607z/`.
+The test VM was deleted and confirmed absent from the final CLI inventory; the
+original CPU VM was untouched. Estimated compute/storage cost was $1.29 through
+instance termination, or $1.70 conservatively including inventory-removal time.

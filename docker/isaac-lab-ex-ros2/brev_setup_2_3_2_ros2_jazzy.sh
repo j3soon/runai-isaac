@@ -96,9 +96,41 @@ else
   if [ "${#OLD_DRIVER_EXTRAS[@]}" -gt 0 ]; then
     sudo env DEBIAN_FRONTEND=noninteractive apt-get remove -y "${OLD_DRIVER_EXTRAS[@]}"
   fi
+  # AWS DLAMI's boot selector restores its archived driver and libraries on
+  # every reboot, overwriting an apt-installed branch. Mask this AWS helper
+  # when taking over driver installation so the selected branch persists.
+  if systemctl cat nvidia-kmod-load.service 2>/dev/null |
+     grep -q '^ExecStart=/opt/aws/dlami/bin/nvidia-kmod-load\.sh'; then
+    sudo systemctl mask --now nvidia-kmod-load.service
+  fi
+  # AWS DLAMI: an unpackaged nvidia-open DKMS installation can survive the
+  # package install. DKMS refuses to downgrade its newer modules but apt can
+  # still exit successfully; ldconfig also keeps selecting its newer libraries.
+  # Remove only unpackaged nvidia-open entries and their unowned versioned
+  # libraries. Keep package-managed files, including Fabric Manager/NSCQ.
+  mapfile -t OLD_OPEN_DRIVER_VERSIONS < <(
+    dkms status -m nvidia-open 2>/dev/null |
+      sed -nE 's@^nvidia-open/([^,:[:space:]]+).*@\1@p' | sort -u
+  )
+  for version in "${OLD_OPEN_DRIVER_VERSIONS[@]}"; do
+    if dpkg-query -S "/usr/src/nvidia-open-$version/dkms.conf" >/dev/null 2>&1; then
+      continue
+    fi
+    sudo dkms remove -m nvidia-open -v "$version" --all
+    for library in /usr/lib/x86_64-linux-gnu/lib{nvidia-*,cuda*,nvcuvid,nvoptix,*_nvidia}.so."$version"; do
+      if [ -f "$library" ] && ! dpkg-query -S "$library" >/dev/null 2>&1; then
+        sudo rm -f -- "$library"
+      fi
+    done
+  done
   sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     "linux-headers-$(uname -r)" \
     "nvidia-driver-$DRIVER_BRANCH"
+  # DKMS can report a module downgrade error without failing the apt step.
+  if [[ "$(modinfo -F version nvidia)" != "$DRIVER_BRANCH".* ]]; then
+    echo "[setup] NVIDIA kernel module on disk is not branch $DRIVER_BRANCH" >&2
+    exit 1
+  fi
   NEEDS_REBOOT=1
 fi
 
