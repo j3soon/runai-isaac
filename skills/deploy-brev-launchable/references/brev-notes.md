@@ -373,6 +373,14 @@ it gives up. The failure looks like a service that never started.
   instance-name alias at its relay, `global.prd.ga.run.brev.nvidia.com`, on a per-instance
   high port. Plain `ssh <instance>` and `ssh -L <local>:localhost:<remote> <instance>`
   work immediately; use those for exec and for probing forwarded services.
+- For a tunnel whose child process the checker supervises, pass
+  `-o ControlMaster=no -o ControlPath=none`. In the November sweep, the tunnel
+  client exited under local `ControlMaster auto` / `ControlPersist` settings;
+  disabling connection sharing let all five forwarded-service checks pass on
+  the unchanged VM. Treat this as a local checker failure, not a setup failure.
+- Inspect Brev bootstrap processes with PID/name/wait-state fields rather than
+  full command lines: their arguments can contain telemetry credentials. Redact
+  credential-bearing journal lines before displaying or sharing diagnostics.
 - That config is written only once the instance exists, so run `brev refresh` *after*
   creating it. Refreshing before creation silently leaves no host entry, and every later
   `ssh` fails with `Could not resolve hostname`.
@@ -547,6 +555,11 @@ like a slow one for as long as the timeout allows.
 
 ## Deletion Reports `DELETING` Long After Billing Stops
 
+Local monitoring exec sessions can themselves end with SIGTERM (status 143)
+while the GPU VM keeps running. Check log freshness and process status, resume
+the budget guard from recorded IDs, and attach to existing workload logs; do
+not restart a creator or the VM's setup script to resume monitoring.
+
 Deleting is two steps, and `brev ls --all` shows `DELETING` for both. The machine is gone
 once the `terminate-environment-instance` task succeeds; the `delete-environment` task
 that follows only clears the control-plane record, and that took ~4 more minutes with the
@@ -654,6 +667,11 @@ These are workload recording options, not changes to the saved Launchable.
 Keep the initial output and the corrected recording when retrying the check.
 
 ### Check services, then exercise the GPU
+
+Keep optional diagnostics from aborting the workload: a native-580 GCP base in
+November had no `dkms` command. Record that absence and validate the loaded and
+on-disk modules; an unconditional `dkms status` under `set -e` incorrectly ended
+the collector with status 127 before application checks could run.
 
 All five services can answer while Isaac Sim cannot initialize, since Kit additionally
 needs GPU passthrough and Vulkan inside the container. Check the driver, the service, and
@@ -966,3 +984,128 @@ Raw evidence is under
 The test VM was deleted and confirmed absent from the final CLI inventory; the
 original CPU VM was untouched. Estimated compute/storage cost was $1.29 through
 instance termination, or $1.70 conservatively including inventory-removal time.
+
+## Lambda Brev Bootstrap Can Fail Before the Launchable Starts
+
+On 2026-11-16, a fresh Lambda `gpu_1x_a10` remained `BUILDING / NOT READY` while
+Brev's `instance-oneshot.service` repeatedly failed. The saved Launchable's phase
+file and user lifecycle script were both absent. The host still ran 570.148.08
+with NVIDIA Container Toolkit 1.17.8; Brev's bootstrap tried to upgrade the toolkit
+to 1.20.1, then apt rejected two definitions of the same NVIDIA repository:
+
+- `/etc/apt/sources.list.d/nvidia-container-toolkit.list` used
+  `/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg`.
+- `/etc/apt/sources.list.d/nvidia-docker-container.list` used
+  `/etc/apt/cloud-init.gpg.d/nvidia-docker-container.gpg`.
+
+Both resolved to `https://nvidia.github.io/libnvidia-container/stable/deb/amd64/`.
+The journal reported `Conflicting values set for option Signed-By`, followed by
+`NVIDIA container toolkit installation failed` and service exit status 1. Brev's
+wrapper then waited about ten minutes before retrying the same failed bootstrap,
+so the console's continuing `BUILDING` status hid the error.
+
+This needs a fix in Brev's bootstrap or the Lambda base image, before the user
+lifecycle script runs; adding cleanup to the Launchable cannot unblock that
+earlier step. Capture the duplicate source files and the redacted
+`journalctl -b -u instance-oneshot.service` output rather than repairing the VM
+and calling it an unchanged deployment. On this Lambda VM, its generated public
+SSH alias worked before Brev exposed a relay or reported shell readiness; that
+does not change the AWS relay requirement above. The failed test VM was deleted.
+
+## Saved 2.3.2 Provider Sweep (2026-11-16)
+
+The updated saved script (`6781dc3d4b03c152f61aac33bd96897d0c22e5619c9dea928a84d91f2fa89f4f`)
+was tested on five additional providers after the default AWS pass above. Only
+instance selection and test names changed; the script, parameters, disk request,
+and Compose file remained unchanged. All inspected images matched the ROS 2
+image digest recorded above. These are cold-start smoke timings, not performance
+benchmarks.
+
+| Provider | Instance | Driver | First ready | Saved Launchable result |
+| --- | --- | --- | ---: | --- |
+| shadeform (Massed Compute) | `massedcompute_A6000_plus` | 580.126.09 | ~14 min | pass |
+| Crusoe | `l40s-48gb.1x` | 580.196.07 | ~12 min | pass after automatic reboot |
+| Nebius | `gpu-l40s-a.1gpu-16vcpu-64gb` | 580.173.02 | ~15 min | pass |
+| GCP | `g2-standard-8:nvidia-l4:1` | 580.178.04 | ~13 min | services pass; NVIDIA Vulkan unavailable |
+| Lambda | `gpu_1x_a10` | 570.148.08 base | — | Brev bootstrap fails before the saved script |
+
+Each full pass required five identified services through SSH tunnels,
+host/container driver checks, NVIDIA Vulkan and an active NVIDIA GPU in Kit,
+ROS 2 pub/sub, bare `SimulationApp` initialization/close, three Cartpole training
+iterations (512 environments), and three RGB-camera training iterations
+(32 environments). Each MP4 decoded all 61 frames, and its sampled 640x480 image
+was inspected. No manual setup repair or reboot was used.
+
+Record root and data disks separately: this Crusoe VM had a 128GiB root disk
+and a separate 256GiB `/data` disk, while the Launchable's request stayed at
+256GiB. The CLI catalog's fixed disk size alone did not describe both devices.
+
+The initial Nebius catalog advertised single-GPU `gpu-l40s-d` shapes. Two creates
+of its cheapest shape returned API 500 without creating a VM. A refreshed catalog
+offered `gpu-l40s-a` single-GPU shapes instead; the current 16-vCPU option created
+successfully and passed. Preserve both catalog snapshots and distinguish a
+create/API failure from a GPU-driver failure. Launchpad and SFCompute offered
+only multi-GPU choices in the initial filtered catalog and were excluded.
+
+GCP's native 580.178.04 base reproduced the headless-driver problem discussed
+above: host/container `nvidia-smi` and every service passed, but `vulkaninfo`
+could not load `libGLX_nvidia.so.0` and listed only CPU `llvmpipe` (vendor
+`0x10005`). The container already requested `NVIDIA_DRIVER_CAPABILITIES=all`.
+The earlier GCP attempt stopped at the optional DKMS diagnostic described above;
+the graphics failure was confirmed on a fresh unchanged deployment after fixing
+that collector. The setup scripts now require the NVIDIA GLX library before
+keeping an existing 580 installation; otherwise they install the full driver
+and follow the existing automatic-reboot path. A separate patched-copy GCP
+deployment reached `ready` in about 26 minutes after its automatic reboot and
+passed the full checks above on 580.178.04, including all 61 camera-video frames.
+This is a pass of the fix, not of the unchanged saved script. The maintained
+Launchable was not edited during those tests; the direct saved-script retest
+below covers the maintainer's subsequent update.
+
+The GCP fix test used script SHA256
+`bf8af64ec97480122ab18a54b93b509fe1640edb32850c2625f56d7a420154e6`.
+Its executable code matches the final repository script; a nearby comment was
+corrected after submission, and the exact diff is retained in the evidence.
+Both scripts passed syntax checks; ten branch-selection cases passed across
+the two scripts, including a large library cache to catch `grep -q`/`pipefail`
+false negatives. Live fix
+validation used the ROS 2 image; Capstone cup-stacking was not rerun.
+
+GCP's first bare Sim probe reached its 300-second limit during progressing
+`RtPso` shader compilation. Its output was preserved, then workload validation
+passed with a 900-second initialization limit on the same boot and container.
+No driver repair, service restart, setup rerun, or manual reboot accompanied
+that workload retry. Allow enough time for cold L4 shader compilation even in
+the bare initialization probe, and require the exact success line and zero exit.
+
+Raw evidence, including the initial collector failure and both Nebius API
+failures, is under
+`artifacts/brev/raw/evidence/provider-sweep/20261116t102228z/`.
+All seven created test VMs were confirmed absent from the final CLI inventory;
+the original CPU VM was untouched. Estimated VM-lifetime cost was $3.49, with
+a conservative budget allowance of $4.09 including cleanup and failed-create
+windows. The two Nebius API failures created no VM.
+
+### Direct Saved GCP Launchable Retest (2026-11-16)
+
+After the maintainer saved the GCP fix, a fresh `g2-standard-8:nvidia-l4:1`
+deployment through the normal `brev create --launchable` command passed. Only
+the test name and instance selection changed; the default 256GiB disk request,
+script parameters, and Compose file were retained. The saved, executed, and
+repository scripts all matched SHA256
+`0eb924d0c10ba6ced96c70638f2539681424c95f319f577fe465d03122f145d8`.
+
+The saved script installed the full 580.178.04 graphics stack, rebooted
+automatically, and reached `ready` in about 22 minutes. All five forwarded
+services, NVIDIA Vulkan and active Kit GPU, ROS 2 pub/sub, bare Sim init/close,
+three Cartpole training iterations (512 environments), and three RGB-camera
+training iterations (32 environments) passed on the first validation run.
+Bare Sim initialization took 35 seconds in this run; all 61 video frames decoded,
+and the sampled 640x480 image was inspected. No setup repair, workload retry,
+service restart, or manual reboot was used.
+
+Raw evidence is under
+`artifacts/brev/raw/evidence/saved-gcp-retest/20261116t130011z/`.
+The test VM was deleted and confirmed absent from the final CLI inventory;
+the original CPU VM was untouched. Conservative compute/storage allowance,
+including provisioning and inventory-removal time, was $0.55.

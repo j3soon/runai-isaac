@@ -60,7 +60,11 @@ sudo curl -fsSL "$COMPOSE_URL" -o "$APP_DIR/compose.yaml"
 set_state "checking-driver"
 DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -1 || true)"
 NEEDS_REBOOT=0
-if [[ "$DRIVER_VERSION" == "$DRIVER_BRANCH".* ]]; then
+# GCP's headless 580 base can omit libGLX_nvidia.so.0: nvidia-smi works,
+# but Vulkan falls back to software rendering. Keep 580 only when its NVIDIA
+# graphics library is available; otherwise install the full driver below.
+if [[ "$DRIVER_VERSION" == "$DRIVER_BRANCH".* ]] &&
+   ldconfig -p | grep -F 'libGLX_nvidia.so.0' >/dev/null; then
   echo "[setup] detected NVIDIA driver $DRIVER_VERSION; leaving NVIDIA packages unchanged"
 else
   set_state "installing-driver"
@@ -69,7 +73,7 @@ else
   # "Package 'nvidia-driver-580' has no installation candidate" despite the
   # package being present in the repositories. Retries cannot fix that policy.
   # Remove only this pin when changing drivers, then refresh package metadata.
-  # rm -f handles an absent AWS preference file; existing 580 hosts skip it.
+  # rm -f handles an absent AWS preference file.
   sudo rm -f /etc/apt/preferences.d/00-dlami-block-nvidia-driver
   sudo apt-get update
   # Crusoe: its installed 565 driver packages were held, preventing apt from

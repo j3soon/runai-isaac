@@ -87,7 +87,11 @@ sudo systemctl enable --now docker.service
 set_state "checking-driver"
 DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -1 || true)"
 NEEDS_REBOOT=0
-if [[ "$DRIVER_VERSION" == "$DRIVER_BRANCH".* ]]; then
+# GCP's headless 580 base can omit libGLX_nvidia.so.0: nvidia-smi works,
+# but Vulkan falls back to software rendering. Keep 580 only when its NVIDIA
+# graphics library is available; otherwise install the full driver below.
+if [[ "$DRIVER_VERSION" == "$DRIVER_BRANCH".* ]] &&
+   ldconfig -p | grep -F 'libGLX_nvidia.so.0' >/dev/null; then
   echo "[setup] detected NVIDIA driver $DRIVER_VERSION; leaving NVIDIA packages unchanged"
 else
   set_state "installing-driver"
