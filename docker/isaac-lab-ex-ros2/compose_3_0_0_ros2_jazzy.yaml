@@ -1,0 +1,37 @@
+services:
+  isaac-sim-ex:
+    image: ${ISAAC_LAB_IMAGE:-j3soon/runai-isaac-lab-ex:3.0.0-ros2-jazzy}
+    restart: unless-stopped
+    # XFCE needs its session D-Bus on AppArmor hosts such as Brev VM Mode.
+    security_opt:
+      - apparmor=unconfined
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "127.0.0.1:${SSH_PORT:-2222}:22"
+      - "127.0.0.1:${VNC_PORT:-5900}:5900"
+      - "127.0.0.1:${NOVNC_PORT:-6080}:6080"
+      - "127.0.0.1:${CODE_SERVER_PORT:-8080}:8080"
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+    volumes:
+      - kit-cache:/isaac-sim/kit/cache
+      - lab-cache:/root/.cache
+      - cuda-cache:/root/.nv/ComputeCache
+      - kit-logs:/isaac-sim/kit/logs
+      - kit-data:/root/.local/share/ov/data
+      # Mount a sibling of /workspace/isaaclab so the bundled source stays visible.
+      - "${WORKSPACE_DIR:-../..}:/workspace/project"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  kit-cache:
+  lab-cache:
+  cuda-cache:
+  kit-logs:
+  kit-data:

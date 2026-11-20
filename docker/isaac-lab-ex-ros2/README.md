@@ -2,7 +2,7 @@
 
 > Experimental: These unofficial Docker images are under active development, with more thorough testing planned in the near future.
 
-This is a series of unofficial Docker images for Isaac Lab (Extended) with ROS 2 installed on top of the Ubuntu 24.04 base image. "Extended" refers to the additional built-in support for Jupyter Lab, VS Code Server, TigerVNC, noVNC, and OpenSSH Server. The instructions cover running the images locally, on Run:ai, and on Brev, but they can be easily adapted to other platforms or re-built with other base images.
+This is a series of unofficial Ubuntu 24.04 Docker images for Isaac Lab (Extended) with ROS 2. "Extended" refers to the additional built-in support for Jupyter Lab, VS Code Server, TigerVNC, noVNC, and OpenSSH Server. The instructions cover running the images locally, on Run:ai, and on Brev, but they can be easily adapted to other platforms or re-built with other base images.
 
 If you encounter any issues or have any questions, please [open an issue](https://github.com/j3soon/runai-isaac/issues).
 
@@ -24,7 +24,15 @@ docker build -t j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy -f docke
 docker push j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy
 ```
 
-> **Note:** These images are self-contained (Ubuntu 24.04 base, not the official Isaac Lab container) and download Isaac Sim (~10 GB) during the build. Build time is significantly longer than the other variants. They include Isaac Lab and ROS 2 Jazzy.
+The older Dockerfiles start from Ubuntu 24.04 and download Isaac Sim (~10 GB) during the build. The 3.0.0 Dockerfile starts from NVIDIA's [Isaac Lab 3.0.0 image](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/isaaclab/installation.html#pre-built-image-from-ngc), which includes Isaac Sim 6.2.0.
+
+Build and test 3.0.0 from the repository root. The last two commands publish the image for Brev and Run:ai.
+
+```sh
+docker build -t local/runai-isaac-lab-ex:3.0.0-ros2-jazzy -f docker/isaac-lab-ex-ros2/Dockerfile_3_0_0_ros2_jazzy .
+docker tag local/runai-isaac-lab-ex:3.0.0-ros2-jazzy j3soon/runai-isaac-lab-ex:3.0.0-ros2-jazzy
+docker push j3soon/runai-isaac-lab-ex:3.0.0-ros2-jazzy
+```
 
 ## Run:ai
 
@@ -37,6 +45,9 @@ Refer to [Isaac Lab (Extended) Interactive Workspace](../isaac-lab-ex/README.md)
 | 2.3.2 | 5.1.0 | Jazzy | j3soon/runai-isaac-lab-ex:2.3.2-ros2-jazzy |
 | 3.0.0-beta2 | 6.0.0 | Jazzy | j3soon/runai-isaac-lab-ex:3.0.0-beta2-ros2-jazzy |
 | 3.0.0-beta2.patch1 | 6.0.1 | Jazzy | j3soon/runai-isaac-lab-ex:3.0.0-beta2.patch1-ros2-jazzy |
+| 3.0.0 | 6.2.0 | Jazzy | j3soon/runai-isaac-lab-ex:3.0.0-ros2-jazzy |
+
+For 3.0.0 environment commands, use `/run.sh --shell 'uv pip install --python /opt/isaaclab-venv/bin/python <package>'` for an extra Lab dependency, or `/run.sh --shell 'source /opt/ros/jazzy/setup.bash && ros2 topic list'` for the Jazzy CLI.
 
 ## Brev
 
@@ -54,6 +65,7 @@ Isaac Lab 3.0.0-beta2.patch1 (Isaac Sim 6.0.1) pins the 595 driver branch instea
 |-----------|-----------|-------|----------|
 | 2.3.2 | 5.1.0 | Jazzy | [![ Click here to deploy.](https://brev-assets.s3.us-west-1.amazonaws.com/nv-lb-dark.svg)](https://brev.nvidia.com/launchable/deploy?launchableID=env-3HmXnNzoex3D9hUuIyUDkeFJbT4) |
 | 3.0.0-beta2.patch1 | 6.0.1 | Jazzy | [![ Click here to deploy.](https://brev-assets.s3.us-west-1.amazonaws.com/nv-lb-dark.svg)](https://brev.nvidia.com/launchable/deploy?launchableID=env-3Hp8A2xYfls4xle14W0891vLF4p) |
+| 3.0.0 | 6.2.0 | Jazzy | [![Launch on Brev](https://brev-assets.s3.us-west-1.amazonaws.com/nv-lb-dark.svg)](https://brev.nvidia.com/launchable/deploy/now?launchableID=env-3MMlXWFf1QEEjjjWgChFCQhlr0Z) |
 
 1. Click one of the Brev badges above to navigate to the Brev launchable page.
 1. (Optional) If you haven't logged in to Brev, click `Sign In`, you will be prompted to log in or register. After logging in, you will be redirected back to the launchable page.
@@ -79,6 +91,25 @@ To build your own launchable, or to deploy another version:
    ```
 
 The systemd unit retries until the GPU driver is ready, while Compose's `restart: unless-stopped` policy keeps the container running across later Docker daemon and VM restarts. The host workspace is `/workspace`.
+
+### Isaac Lab 3.0.0
+
+Use the **Isaac Lab 3.0.0, Sim 6.2.0, ROS 2 Jazzy** badge above. To create your own Launchable, select VM Mode and start with an x86-64 L40S instance such as `g6e.xlarge` and 256 GiB of storage. In the Brev Console, leave host Jupyter disabled so the container can use port `8888`. Paste [the 3.0.0 setup script](./brev_setup_3_0_0_ros2_jazzy.sh) and add Secure Links for noVNC (`6080`), code-server (`8080`), and JupyterLab (`8888`). The setup pulls the published image and fetches the versioned Compose file from the repository, so both must be available before deployment.
+
+This version uses the NVIDIA driver and Container Toolkit supplied by the Brev VM. NVIDIA tested [Isaac Sim 6.2.0](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/installation/requirements.html) with Linux driver `595.58.03`. The setup logs the loaded driver and writes `ready` after Compose starts with an NVIDIA Vulkan device. Check `/var/log/isaac-lab-ex-ros2-setup.log` and `sudo journalctl -u isaac-lab-ex-ros2.service` if setup stalls. The VM's `/workspace` is available inside the container at `/workspace/project`.
+
+Budget 32 GiB of VM RAM for RTX camera workloads and allow several minutes for first-run shader compilation. A local camera smoke test exhausted an 11 GiB container limit during compilation.
+
+The app's ports bind to the VM's loopback address. Use SSH forwarding for native VNC and container SSH. The container's SSH login is `isaaclab` and uses a public key in `/root/.ssh/authorized_keys`.
+
+After the setup reports `ready`, run a short Isaac Lab GPU workload from the VM shell.
+
+```sh
+sudo docker compose -f /opt/isaac-lab-ex-ros2/compose.yaml \
+  exec -T --user isaaclab --workdir /workspace/project isaac-sim-ex \
+  isaaclab train --rl_library rsl_rl --task Isaac-Cartpole-Direct \
+  --num_envs 32 --max_iterations 3 physics=isaacsim_physx
+```
 
 ### Verified Instance Types (2.3.2)
 
@@ -182,10 +213,22 @@ source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
 ros2 topic list
 ```
 
+### Isaac Lab 3.0.0
+
+Run the locally built image using the versioned Compose file. Open `http://localhost:6080/` for the desktop and run `/isaac-sim/isaac-sim.sh` in its terminal. Source `/opt/ros/jazzy/setup.bash` in a separate terminal for the ROS 2 CLI. Run training from `/workspace/project` to keep checkpoints and logs in the host workspace.
+
+```sh
+export ISAAC_LAB_IMAGE=local/runai-isaac-lab-ex:3.0.0-ros2-jazzy
+docker compose -f docker/isaac-lab-ex-ros2/compose_3_0_0_ros2_jazzy.yaml up -d
+docker compose -f docker/isaac-lab-ex-ros2/compose_3_0_0_ros2_jazzy.yaml \
+  exec --user isaaclab isaac-sim-ex /run.sh --shell 'source /opt/ros/jazzy/setup.bash && ros2 topic list'
+docker compose -f docker/isaac-lab-ex-ros2/compose_3_0_0_ros2_jazzy.yaml down
+```
+
 ## Developer Notes
 
-We intentionally install Isaac Sim via binary instead of pip, since the accompanied source code and example code can greatly help AI agents to write new code.
+The older images install the Isaac Sim binary instead of pip, since the accompanied source code and example code can greatly help AI agents to write new code.
 
-Isaac Lab is cloned from source and installed via `isaaclab.sh --install`, so the full codebase is available at `/root/IsaacLab` inside the container.
+In the older images, Isaac Lab is cloned from source and installed via `isaaclab.sh --install`, so the full codebase is available at `/root/IsaacLab`. The 3.0.0 image inherits the Isaac Lab source at `/workspace/isaaclab` and the Python environment at `/opt/isaaclab-venv` from NVIDIA's image.
 
 For the 2.3.2 image, `isaacsim_ml_archive.pth` is required. Isaac Sim 5.1 does not put `exts/omni.isaac.ml_archive/pip_prebundle` on embedded Python's initial `sys.path`, although Torch and its bundled CUDA libraries are stored there. Python processes the `.pth` file during site initialization, before Kit extensions import Torch. In a clean A/B build, removing it produced 203 Kit errors and 104 tracebacks, including 141 reports that `libcublas` could not be found; restoring it reduced all three counts to zero and allowed the ROS bridge and `rclpy` to load.

@@ -1,0 +1,83 @@
+# Upstream: https://github.com/isaac-sim/IsaacLab/blob/e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4/docker/Dockerfile.base
+FROM nvcr.io/nvidia/isaac-lab:3.0.0
+
+LABEL org.opencontainers.image.version="3.0.0-ros2-jazzy"
+USER root
+
+# The NGC image supplies Isaac Sim 6.2.0, Isaac Lab, and the Lab Python environment.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    dbus-x11 git-lfs htop locales mesa-utils nano net-tools novnc openssh-server \
+    python3-venv supervisor tigervnc-standalone-server tmux vulkan-tools \
+    websockify x11-apps x11-utils xauth xfce4 xfce4-terminal \
+    && locale-gen en_US.UTF-8 \
+    && update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+ENV SHELL=/bin/bash
+ENV PATH=/opt/isaaclab-venv/bin:${PATH}
+
+# Use the Ubuntu Noble ROS 2 apt source package for Jazzy.
+# Isaac Sim's launcher fills in ROS_DISTRO and its bundled library path together.
+RUN curl -fsSL -o /tmp/ros2-apt-source.deb \
+        https://github.com/ros-infrastructure/ros-apt-source/releases/download/1.3.0/ros2-apt-source_1.3.0.noble_all.deb \
+    && apt-get install -y /tmp/ros2-apt-source.deb \
+    && rm /tmp/ros2-apt-source.deb \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ros-jazzy-desktop ros-dev-tools ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-ros-gz \
+    && rosdep init \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN CODE_SERVER_VERSION=4.125.0 \
+    && curl -fsSL -o /tmp/code-server.deb \
+        "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_amd64.deb" \
+    && dpkg -i /tmp/code-server.deb \
+    && rm /tmp/code-server.deb \
+    && /usr/bin/python3 -m venv /opt/jupyter-venv \
+    && /opt/jupyter-venv/bin/pip install --no-cache-dir jupyterlab
+
+# The upstream isaaclab account uses /root with UID/GID 1000.
+RUN install -d -o isaaclab -g 1000 -m 0755 /workspace/project \
+    && chown -R isaaclab:1000 /isaac-sim/kit/logs \
+    && install -d -o isaaclab -g 1000 -m 0700 /root/.vnc /root/.ssh \
+    && install -d -m 0755 /run/sshd \
+    && ln -sf vnc.html /usr/share/novnc/index.html
+
+RUN cat > /root/.vnc/xstartup <<'EOF'
+#!/bin/sh
+exec dbus-launch --exit-with-session startxfce4
+EOF
+RUN chown isaaclab:1000 /root/.vnc/xstartup && chmod 0755 /root/.vnc/xstartup
+
+RUN cat > /etc/supervisor/conf.d/workspace.conf <<'EOF'
+[program:sshd]
+command=/usr/sbin/sshd -D -e -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o PermitRootLogin=no
+
+[program:tigervnc]
+command=/usr/bin/tigervncserver -fg :0 -geometry 1920x1080 -depth 24 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE -xstartup /root/.vnc/xstartup
+user=isaaclab
+environment=USER="isaaclab",LOGNAME="isaaclab",__EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+
+[program:novnc]
+command=/usr/share/novnc/utils/novnc_proxy --listen 0.0.0.0:6080 --vnc localhost:5900
+user=isaaclab
+
+[program:code-server]
+command=/usr/bin/code-server --bind-addr 0.0.0.0:8080 --auth none /workspace/project
+user=isaaclab
+
+[program:jupyter-lab]
+command=/opt/jupyter-venv/bin/jupyter lab --ip=0.0.0.0 --no-browser --ServerApp.root_dir=/workspace/project --IdentityProvider.token=
+user=isaaclab
+EOF
+
+COPY --chown=isaaclab:1000 thirdparty/omnicli /omnicli
+COPY --chown=isaaclab:1000 scripts/docker/run.sh /run.sh
+RUN chmod +x /omnicli/omnicli /run.sh && sed -i 's/\r$//' /run.sh
+
+# Supervisor starts the desktop services. Kit is launched from the desktop or shell,
+# so the upstream health check for a running Kit server does not apply.
+HEALTHCHECK NONE
+ENTRYPOINT []
+CMD ["/usr/bin/supervisord", "-n"]
