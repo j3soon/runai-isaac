@@ -36,6 +36,9 @@ Two traps that make inference unreliable:
 - **A partially pulled image is invisible to `docker images`**, which lists nothing until
   the pull completes. An empty result is not evidence that a pull never started; check
   `pgrep -af 'apt-get|docker compose'` instead.
+  With Docker's containerd image store, the download and unpack use
+  `/var/lib/containerd` and `/var/lib/docker` can stay small until Compose starts.
+  Compare `df -h /` between checks and look for `unpigz` to observe layer extraction.
 - **`build_status=COMPLETED` is not a readiness signal.** Brev reports it roughly 14
   minutes before the setup script actually finishes. Wait for the `ready` phase, which
   the systemd unit writes after Compose is up.
@@ -640,6 +643,14 @@ do not equate a quiet warning-level stdout log with a dead simulator.
 A later 8-vCPU L4 run passed in 485s with the same two episodes / 1010 frames per camera.
 These are individual cold-start smoke runs; toolkit configuration and startup caches also
 varied, so the timings do not isolate a CPU scaling ratio.
+
+### Keep Compose exec from consuming the rest of an SSH script
+
+When a smoke script is piped to `ssh <instance> bash -s`, use
+`docker compose exec -T --interactive=false` for commands that need no input.
+`-T` disables the terminal. The first Compose exec can still consume the
+remaining script through stdin. An NVIDIA driver line followed by empty output
+can indicate that training never started.
 
 ### Keep machine-readable probes separate from container banners
 
